@@ -1,0 +1,424 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentProvider {
+  CLICK
+  PAYME
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum ReferralStatus {
+  PENDING
+  REWARDED
+}
+
+enum AdminRole {
+  SUPERADMIN
+  EDITOR
+}
+
+enum QuestionType {
+  CLOSED
+  OPEN
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model User {
+  dailyStudyMinutes   Int?
+  selfLevel           String?
+  onboardingCompleted Boolean @default(false)
+  onboarding          OnboardingSession?
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  name                String?
+  avatarUrl           String?
+  examDate            DateTime?
+  isPremium           Boolean   @default(false)
+  premiumExpiresAt    DateTime?
+  referralCode        String    @unique
+  referredByCode      String?
+  walletBalance       Int       @default(0) // so'mda, butun son
+  createdAt           DateTime  @default(now())
+
+  progress            UserProgress[]
+  answers             UserAnswer[]
+  streak              Streak?
+  payments            Payment[]
+  examSessions        ExamSession[]
+  referralsMade       Referral[] @relation("Referrer")
+  referralReceived    Referral?  @relation("ReferredUser")
+  withdrawals         Withdrawal[]
+  premiumGrants       PremiumGrant[]
+  aiRecommendation    AiRecommendation?
+    conversationParticipants ConversationParticipant[]
+  messagesSent             Message[]
+}
+
+model Module {
+  id        String   @id @default(uuid())
+  title     String
+  order     Int
+  weeks     Week[]
+  createdAt DateTime @default(now())
+}
+
+model Week {
+  id        String   @id @default(uuid())
+  moduleId  String
+  module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title     String
+  order     Int
+  lessons   Lesson[]
+  createdAt DateTime @default(now())
+}
+
+model Lesson {
+  id           String         @id @default(uuid())
+  weekId       String
+  week         Week           @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  title        String
+  content      String         @db.Text // 5-10 daqiqalik matn
+  order        Int
+  articleLabel String?        // masalan "12-18-moddalar" - dashboardda "bugun nima o'qidingiz" uchun
+  questions    Question[]
+  progress     UserProgress[]
+  createdAt    DateTime       @default(now())
+}
+
+model Question {
+  id            String       @id @default(uuid())
+  lessonId      String
+  lesson        Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  text          String       @db.Text
+  options       String[]     // 4 ta variant (faqat CLOSED turi uchun)
+  correctIndex  Int          // faqat CLOSED turi uchun
+  explanation   String       @db.Text
+  answers       UserAnswer[]
+  createdAt     DateTime     @default(now())
+
+  // Milliy sertifikat mock imtihoni uchun qo'shimcha maydonlar
+  questionType  QuestionType @default(CLOSED)
+  difficulty    Int          @default(1) // 1 yoki 2 - yopiq savol ballini aniqlaydi (1.3 yoki 2.2)
+  partAPrompt   String?      @db.Text // faqat OPEN turi uchun
+  partAAnswer   String?      @db.Text // namunaviy javob (AI shu bilan solishtiradi)
+  partBPrompt   String?      @db.Text
+  partBAnswer   String?      @db.Text
+
+  examAnswers   ExamAnswer[]
+}
+
+model UserProgress {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+
+  @@unique([userId, lessonId])
+  @@index([userId, completedAt])
+}
+
+model UserAnswer {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId   String
+  question     Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  chosenIndex  Int
+  isCorrect    Boolean
+  answeredAt   DateTime @default(now())
+}
+
+model Streak {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentCount      Int       @default(0)
+  longestCount      Int       @default(0)   // eng yaxshi natija - doim ko'rsatiladi, hatto streak uzilsa ham
+  lastActiveDate    DateTime?               // kunning boshiga normallashtirilgan (UTC 00:00)
+  freezesAvailable  Int       @default(0)   // bir kun o'tkazib yuborilsa streak'ni saqlab qoladi
+  freezesUsedTotal  Int       @default(0)
+  lastMilestoneHit  Int       @default(0)   // oxirgi mukofot berilgan bosqich - qayta bermaslik uchun
+  updatedAt         DateTime  @updatedAt
+}
+
+model Referral {
+  id               String         @id @default(uuid())
+  referrerId       String
+  referrer         User           @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUserId   String         @unique
+  referredUser     User           @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+  rewardAmount     Int            @default(0)
+  status           ReferralStatus @default(PENDING)
+  createdAt        DateTime       @default(now())
+
+  @@index([referrerId])
+}
+
+// Foydalanuvchi hamyonidagi (referral bonuslaridan yig'ilgan) pulni yechib olish so'rovi.
+// So'rov yuborilganda summasi walletBalance'dan darhol ayiriladi (double-spend'ning oldini olish
+// uchun) - REJECTED bo'lsa qaytariladi, APPROVED/PAID bo'lsa qaytarilmaydi.
+model Withdrawal {
+  id          String           @id @default(uuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Int
+  status      WithdrawalStatus @default(PENDING)
+  note        String?          @db.Text
+  requestedAt DateTime         @default(now())
+  processedAt DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Premium berilgan har bir hodisani audit qilish uchun (to'lov, referral bonusi yoki admin
+// tomonidan qo'lda berilgan) - kelajakda "premium qayerdan kelyapti" statistikasi uchun foydali.
+model PremiumGrant {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  months    Int
+  source    String   // 'PAYMENT' | 'REFERRAL_BONUS' | 'ADMIN_GRANT'
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Payment {
+  id        String          @id @default(uuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount    Int             // so'mda (Payme ichkarida tiyinga o'giradi, chunki ular shu birlikda ishlaydi)
+  months    Int             @default(1) // sotib olinayotgan premium necha oylik
+  provider  PaymentProvider
+  status    PaymentStatus   @default(PENDING)
+  // Click uchun merchant_prepare_id/merchant_trans_id sifatida, Payme javoblarida "transaction"
+  // maydoni sifatida ishlatiladigan qisqa, ketma-ket raqam (UUID emas - provayderlar buni kutadi)
+  seq       Int             @default(autoincrement()) @unique
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  clickTransactions ClickTransaction[]
+  paymeTransactions PaymeTransaction[]
+}
+
+enum ClickTransactionState {
+  CREATED   // Prepare bosqichi o'tdi, Complete kutilmoqda
+  CONFIRMED // Complete muvaffaqiyatli
+  CANCELLED
+}
+
+// Click SHOP API ikki bosqichli (Prepare -> Complete): shu jarayonning holatini alohida
+// jadvalda kuzatamiz - shunda bitta Payment uchun bir necha urinish bo'lsa ham (masalan
+// foydalanuvchi to'lovni bekor qilib, qayta urinsa) hech narsa yo'qolmaydi/chalkashmaydi.
+model ClickTransaction {
+  id            Int                   @id @default(autoincrement()) // Click'ga merchant_prepare_id sifatida qaytariladi
+  paymentId     String
+  payment       Payment               @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  clickTransId  String                @unique // Click tomonidagi tranzaksiya ID (click_trans_id)
+  clickPaydocId String?
+  state         ClickTransactionState @default(CREATED)
+  createdAt     DateTime              @default(now())
+  confirmedAt   DateTime?
+  cancelledAt   DateTime?
+
+  @@index([paymentId])
+}
+
+enum PaymeTransactionState {
+  CREATED                  // 1 - yaratilgan, hali to'lanmagan
+  COMPLETED                // 2 - muvaffaqiyatli to'langan
+  CANCELLED                // -1 - to'lanishdan oldin bekor qilingan
+  CANCELLED_AFTER_COMPLETE // -2 - to'langandan keyin bekor qilingan (pul qaytarilgan)
+}
+
+// Payme JSON-RPC Merchant API talab qiladigan holat mashinasi (CheckPerform -> Create ->
+// Perform -> Cancel). paymeId - Payme'dan kelgan tranzaksiya identifikatori, @unique -
+// shu orqali CreateTransaction bir necha marta chaqirilsa ham (tarmoq retry) ikkinchi marta
+// yangi yozuv yaratilmaydi (idempotentlik).
+model PaymeTransaction {
+  id          String                @id @default(uuid())
+  paymeId     String                @unique
+  paymentId   String
+  payment     Payment               @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount      Int                   // tiyinda (Payme shu birlikda yuboradi)
+  state       PaymeTransactionState @default(CREATED)
+  reason      Int?
+  createTime  DateTime              @default(now())
+  performTime DateTime?
+  cancelTime  DateTime?
+
+  @@index([paymentId])
+}
+
+model Admin {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  role         AdminRole @default(EDITOR)
+  createdAt    DateTime  @default(now())
+}
+
+// Premium foydalanuvchi uchun AI (Anthropic Claude) tomonidan generatsiya qilingan
+// shaxsiylashtirilgan tavsiya. Har bir foydalanuvchi uchun BITTA yozuv (userId @unique) -
+// yangi tavsiya generatsiya qilinganda ustidan yoziladi (tarix saqlanmaydi, faqat oxirgisi).
+// "content" - AI javobi tekshirilgan/tozalangandan keyingi strukturaviy JSON (AiService'dagi
+// shaklga mos: summary, focusAreas, studyPlan, motivation, examReadiness).
+// Bu yozuv ikki maqsadga xizmat qiladi: (1) kesh - har so'rovda qimmat AI chaqiruvini
+// takrorlamaslik, (2) audit - AI qachon nima tavsiya qilgani tarixda (oxirgisi) qolishi.
+model AiRecommendation {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// SMS OTP kodlarini vaqtincha saqlash uchun
+// XAVFSIZLIK: kod ochiq matnda emas, HMAC-SHA256 hash sifatida saqlanadi (OTP_PEPPER bilan) -
+// shunda DB sizib chiqsa ham amaldagi kodlarni to'g'ridan-to'g'ri ishlatib bo'lmaydi.
+// "attempts" - noto'g'ri urinishlar soni, MAX_VERIFY_ATTEMPTS dan oshsa kod bekor qilinadi (brute-force himoyasi).
+model OtpCode {
+  id        String    @id @default(uuid())
+  email     String
+  codeHash  String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@index([email, createdAt])
+}
+
+model OnboardingSession {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  status    String   @default("in_progress") // in_progress | completed
+  history   Json     @default("[]") // [{ question, answer }]
+  profile   Json?    // final structured profile once completed
+  plan      Json?    // final personalized welcome plan once completed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+enum ExamSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+}
+
+model ExamSession {
+  id          String            @id @default(uuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      ExamSessionStatus @default(IN_PROGRESS)
+  startedAt   DateTime          @default(now())
+  expiresAt   DateTime          // startedAt + 150 daqiqa
+  submittedAt DateTime?
+  totalScore  Float?
+  maxScore    Float?
+  percentage  Float?
+  grade       String?
+
+  answers     ExamAnswer[]
+
+  @@index([userId])
+}
+
+model ExamAnswer {
+  id            String      @id @default(uuid())
+  examSessionId String
+  examSession   ExamSession @relation(fields: [examSessionId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      Question    @relation(fields: [questionId], references: [id])
+
+  // CLOSED turi uchun
+  chosenIndex   Int?
+  isCorrect     Boolean?
+
+  // OPEN turi uchun
+  partAText     String?     @db.Text
+  partBText     String?     @db.Text
+  partACorrect  Boolean?
+  partBCorrect  Boolean?
+
+  pointsEarned  Float       @default(0)
+  createdAt     DateTime    @default(now())
+
+  @@index([examSessionId])
+}
+enum ConversationType {
+  DM
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  FILE
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  type      ConversationType @default(DM)
+  name      String?  // faqat GROUP uchun keyinroq
+  createdAt DateTime @default(now())
+
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt       DateTime     @default(now())
+  lastReadAt     DateTime?    // "o'qilmagan xabarlar" hisoblash uchun keyinroq
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  type           MessageType  @default(TEXT)
+  content        String?      @db.Text   // TEXT va emoji shu yerda (emoji = oddiy unicode matn)
+  mediaUrl       String?                 // IMAGE/VIDEO/FILE uchun — keyinroq to'ldiriladi
+  mediaFileName  String?
+  mediaSizeBytes Int?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
