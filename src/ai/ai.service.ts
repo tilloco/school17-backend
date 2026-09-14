@@ -57,12 +57,7 @@ export class AiService {
   async getRecommendation(userId: string, forceRefresh: boolean) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
-    if (!this.premium.isActive(user)) {
-      throw new ForbiddenException({
-        code: 'PREMIUM_REQUIRED',
-        message: 'Shaxsiylashtirilgan AI tavsiyalar faqat Premium foydalanuvchilar uchun mavjud',
-      });
-    }
+  
 
     const existing = await this.prisma.aiRecommendation.findUnique({ where: { userId } });
     const now = Date.now();
