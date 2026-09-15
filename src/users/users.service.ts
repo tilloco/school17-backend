@@ -88,4 +88,27 @@ export class UsersService {
       weakTopics,
     };
   }
+    // Xabar yozish uchun foydalanuvchini ism yoki email bo'yicha qidirish
+  async searchUsers(currentUserId: string, query: string) {
+    if (!query.trim()) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: { not: currentUserId },
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { email: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatarUrl: true,
+      },
+      take: 20,
+    });
+
+    return users;
+  }
 }
