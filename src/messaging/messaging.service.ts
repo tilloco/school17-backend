@@ -24,7 +24,34 @@ export class MessagingService {
       },
     });
   }
+  async assertParticipant(conversationId: string, userId: string) {
+    const p = await this.prisma.conversationParticipant.findUnique({
+      where: { conversationId_userId: { conversationId, userId } },
+    });
+    if (!p) throw new Error('NOT_A_PARTICIPANT');
+  }
 
+  createGroup(creatorId: string, name: string, memberIds: string[]) {
+    const allIds = [...new Set([creatorId, ...memberIds])];
+    return this.prisma.conversation.create({
+      data: {
+        type: 'GROUP',
+        name,
+        participants: { create: allIds.map((userId) => ({ userId })) },
+      },
+    });
+  }
+
+  getMyConversations(userId: string) {
+    return this.prisma.conversation.findMany({
+      where: { participants: { some: { userId } } },
+      include: {
+        participants: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
+        messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
   createMessage(data: { conversationId: string; senderId: string; type?: string; content?: string; mediaUrl?: string }) {
     return this.prisma.message.create({
       data: {

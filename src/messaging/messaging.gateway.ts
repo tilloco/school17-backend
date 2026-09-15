@@ -31,17 +31,18 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   handleDisconnect() {}
-
-  @SubscribeMessage('conversation:join')
-  handleJoin(@ConnectedSocket() client: Socket, @MessageBody() conversationId: string) {
-    client.join(`conversation:${conversationId}`);
-  }
-
-  @SubscribeMessage('message:send')
+   @SubscribeMessage('message:send')
   async handleSend(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string; type?: string; content?: string; mediaUrl?: string },
   ) {
+    try {
+      await this.messagingService.assertParticipant(data.conversationId, client.data.userId);
+    } catch {
+      client.emit('error', 'NOT_A_PARTICIPANT');
+      return;
+    }
+
     const message = await this.messagingService.createMessage({
       conversationId: data.conversationId,
       senderId: client.data.userId,
