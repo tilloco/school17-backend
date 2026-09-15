@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Query, Body, Controller, Get, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
@@ -35,5 +35,11 @@ export class UsersController {
   @Get('dashboard')
   getDashboard(@Req() req: any) {
     return this.usersService.getDashboard(req.user.userId);
+  }
+
+  // GET /users/search?q=ali — foydalanuvchini ism bo'yicha qidirish (xabar yozish uchun)
+  @Get('search')
+  searchUsers(@Req() req: any, @Query('q') query: string) {
+    return this.usersService.searchUsers(req.user.userId, query || '');
   }
 }
