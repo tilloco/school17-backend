@@ -41,9 +41,14 @@ export class PremiumService {
 
   // Premium holatini (haqiqatan ham amal qilyaptimi) tekshiradi. isPremium=true bo'lsa-da
   // muddati o'tgan bo'lishi mumkin, shuning uchun har doim shu funksiya orqali tekshirish kerak.
-  isActive(user: { isPremium: boolean; premiumExpiresAt: Date | null }): boolean {
-    return user.isPremium && (!user.premiumExpiresAt || user.premiumExpiresAt > new Date());
-  }
+isActive(user: { isPremium: boolean; premiumExpiresAt: Date | null }): boolean {
+  // VAQTINCHALIK: to'lov tizimi hali tayyor emas, shuning uchun test davrida
+  // BARCHA foydalanuvchilar uchun Premium ochiq. To'lov sahifasi tayyor bo'lgach,
+  // shu qatorni o'chirib, pastdagi asl logikani qaytaring:
+  return true;
+
+  // return user.isPremium && (!user.premiumExpiresAt || user.premiumExpiresAt > new Date());
+}
 
   // Har kecha cron orqali chaqirilishi mumkin: muddati o'tgan lekin hali isPremium=true
   // bo'lib turgan foydalanuvchilarni "false" qilib qo'yadi (dashboard/limitlar to'g'ri ishlashi uchun).

@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/c
 import { ContentService } from './content.service';
 import { AdminJwtAuthGuard } from '../admin-auth/admin-jwt-auth.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CreateModuleDto, CreateWeekDto, CreateLessonDto, CreateQuestionDto } from './dto/content.dto';
+import { CreateModuleDto, CreateWeekDto, CreateLessonDto, CreateQuestionDto, BulkCreateQuestionsDto } from './dto/content.dto';
 
 @Controller('content')
 export class ContentController {
@@ -49,13 +49,24 @@ export class ContentController {
   createLesson(@Body() dto: CreateLessonDto) {
     return this.contentService.createLesson(dto);
   }
-
   @UseGuards(AdminJwtAuthGuard)
   @Post('questions')
   createQuestion(@Body() dto: CreateQuestionDto) {
     return this.contentService.createQuestion(dto);
   }
 
+  // Bitta lessonId + katta matn bo'lagi (bir nechta savol) - tezkor ommaviy qo'shish uchun
+  @UseGuards(AdminJwtAuthGuard)
+  @Post('questions/bulk')
+  createQuestionsBulk(@Body() dto: BulkCreateQuestionsDto) {
+    return this.contentService.createQuestionsBulk(dto);
+  }
+  // Admin panelida modul → hafta → dars daraxtini ko'rish uchun (savol qo'shishda dars tanlash)
+  @UseGuards(AdminJwtAuthGuard)
+  @Get('admin/modules')
+  listModulesAdmin() {
+    return this.contentService.listModules();
+  }
   @UseGuards(AdminJwtAuthGuard)
   @Delete('lessons/:id')
   deleteLesson(@Param('id') id: string) {

@@ -38,8 +38,6 @@ export class ExamService {
   async start(userId: string) {
     await this.assertPremium(userId);
 
-    // Foydalanuvchida hali tugallanmagan sessiya bo'lsa, o'shani davom ettiramiz
-    // (yangi boshlash tugmasi ustma-ust bosilsa ham ikkita sessiya ochilib qolmasligi uchun)
     const existing = await this.prisma.examSession.findFirst({
       where: { userId, status: 'IN_PROGRESS' },
       orderBy: { startedAt: 'desc' },
@@ -50,7 +48,6 @@ export class ExamService {
     }
 
     if (existing) {
-      // Muddati o'tgan eski sessiyani yopamiz
       await this.finalizeExpired(existing.id);
     }
 
@@ -80,7 +77,6 @@ export class ExamService {
   }
 
   private async pickRandom(type: 'CLOSED' | 'OPEN', count: number) {
-    // Postgres: tasodifiy tartibda tanlash - kichik savol banki uchun yetarli tez
     return this.prisma.$queryRawUnsafe<{ id: string }[]>(
       `SELECT id FROM "Question" WHERE "questionType" = $1 ORDER BY RANDOM() LIMIT $2`,
       type,
@@ -88,9 +84,6 @@ export class ExamService {
     );
   }
 
-  // Sessiya uchun BARCHA savollarni bir martada mobil ilovaga qaytaradi (to'g'ri
-  // javob/namunaviy javob YO'Q) - shunda foydalanuvchi savoldan-savolga o'tganda
-  // internetga bog'liq bo'lmaydi, tajriba silliq bo'ladi.
   private async buildSessionPayload(sessionId: string) {
     const session = await this.prisma.examSession.findUniqueOrThrow({
       where: { id: sessionId },
@@ -109,7 +102,6 @@ export class ExamService {
       options: a.question.questionType === 'CLOSED' ? a.question.options : undefined,
       partAPrompt: a.question.questionType === 'OPEN' ? a.question.partAPrompt : undefined,
       partBPrompt: a.question.questionType === 'OPEN' ? a.question.partBPrompt : undefined,
-      // Foydalanuvchi ilgari saqlagan javobi (autosave'dan tiklash uchun)
       savedChosenIndex: a.chosenIndex,
       savedPartAText: a.partAText,
       savedPartBText: a.partBText,
@@ -125,8 +117,6 @@ export class ExamService {
     };
   }
 
-  // Har bir javobni real vaqtda saqlaydi (baholamasdan) - ilova yopilib qolsa ham
-  // javoblar yo'qolmaydi. Chaqiruv arzon - hech qanday AI/og'ir hisoblash yo'q.
   async saveAnswer(
     userId: string,
     sessionId: string,
@@ -169,19 +159,16 @@ export class ExamService {
     await this.grade(sessionId, 'EXPIRED');
   }
 
-  // Milliy sertifikat rasmiy ball jadvali bo'yicha darajani hisoblaydi
- private calculateGrade(totalScore: number): string | null {
-  if (totalScore >= 70) return "A+";
-  if (totalScore >= 65) return "A";
-  if (totalScore >= 60) return "B+";
-  if (totalScore >= 55) return "B";
-  if (totalScore >= 50) return "C+";
-  if (totalScore >= 46) return "C";
-  return null; // 46 balldan past - sertifikatga loyiq emas
-}
+  private calculateGrade(totalScore: number): string | null {
+    if (totalScore >= 70) return "A+";
+    if (totalScore >= 65) return "A";
+    if (totalScore >= 60) return "B+";
+    if (totalScore >= 55) return "B";
+    if (totalScore >= 50) return "C+";
+    if (totalScore >= 46) return "C";
+    return null;
+  }
 
-  // Yopiq savollarni darhol, ochiq savollarni AI orqali (bo'lim A/B alohida)
-  // baholaydi, so'ng rasmiy milliy sertifikat ball tizimi bo'yicha umumiy natijani hisoblaydi.
   private async grade(sessionId: string, finalStatus: 'COMPLETED' | 'EXPIRED' = 'COMPLETED') {
     const session = await this.prisma.examSession.findUniqueOrThrow({
       where: { id: sessionId },
@@ -233,7 +220,7 @@ export class ExamService {
     }
 
     const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0;
-const grade = this.calculateGrade(totalScore);
+    const grade = this.calculateGrade(totalScore);
 
     await this.prisma.examSession.update({
       where: { id: sessionId },
@@ -258,11 +245,12 @@ const grade = this.calculateGrade(totalScore);
     partBModelAnswer: string,
     partBUserAnswer: string,
   ): Promise<{ partACorrect: boolean; partBCorrect: boolean }> {
-    const apiKey = this.config.get<string>('GEMINI_API_KEY');
+    const apiKeys = [
+      this.config.get<string>('GEMINI_API_KEY'),
+      this.config.get<string>('GEMINI_API_KEY_2'),
+    ].filter((k): k is string => !!k);
 
-    // AI mavjud bo'lmasa - ikkalasini ham noto'g'ri deb hisoblaymiz (foydalanuvchiga
-    // haqsiz ball berilishining oldini olish uchun xavfsiz tomonga og'amiz)
-    if (!apiKey) {
+    if (apiKeys.length === 0) {
       this.logger.warn('GEMINI_API_KEY sozlanmagan - ochiq savol baholanmadi (0 ball)');
       return { partACorrect: false, partBCorrect: false };
     }
@@ -281,27 +269,35 @@ const grade = this.calculateGrade(totalScore);
       partB: { prompt: partBPrompt, modelAnswer: partBModelAnswer, studentAnswer: partBUserAnswer },
     });
 
-    try {
-      const res = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-        {
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: userContent }] }],
-          generationConfig: { responseMimeType: 'application/json' },
-        },
-        { headers: { 'x-goog-api-key': apiKey, 'content-type': 'application/json' }, timeout: 20_000 },
-      );
+    for (let i = 0; i < apiKeys.length; i++) {
+      const apiKey = apiKeys[i];
+      try {
+        const res = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+          {
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: userContent }] }],
+            generationConfig: { responseMimeType: 'application/json' },
+          },
+          { headers: { 'x-goog-api-key': apiKey, 'content-type': 'application/json' }, timeout: 20_000 },
+        );
 
-      const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      const parsed = JSON.parse(text);
-      return {
-        partACorrect: parsed.partACorrect === true,
-        partBCorrect: parsed.partBCorrect === true,
-      };
-    } catch (err) {
-      this.logger.error(`Ochiq savol baholashda xatolik: ${err instanceof Error ? err.message : String(err)}`);
-      return { partACorrect: false, partBCorrect: false };
+        const text = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const parsed = JSON.parse(text);
+        return {
+          partACorrect: parsed.partACorrect === true,
+          partBCorrect: parsed.partBCorrect === true,
+        };
+      } catch (err) {
+        const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+        this.logger.warn(`Gemini key #${i + 1} bilan xatolik (status: ${status ?? 'unknown'}) - keyingi kalitga o'tilmoqda`);
+        if (i === apiKeys.length - 1) {
+          this.logger.error(`Barcha Gemini kalitlar ishlamadi: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
     }
+
+    return { partACorrect: false, partBCorrect: false };
   }
 
   async getResult(sessionId: string) {
@@ -319,7 +315,7 @@ const grade = this.calculateGrade(totalScore);
       totalScore: session.totalScore,
       maxScore: session.maxScore,
       percentage: session.percentage,
-     grade: session.grade,
+      grade: session.grade,
       closedCorrect: closedAnswers.filter((a) => a.isCorrect).length,
       closedTotal: closedAnswers.length,
       openFullyCorrect: openAnswers.filter((a) => a.partACorrect && a.partBCorrect).length,

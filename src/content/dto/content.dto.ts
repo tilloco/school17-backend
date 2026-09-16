@@ -56,3 +56,10 @@ export class CreateQuestionDto {
   @IsString()
   explanation: string;
 }
+export class BulkCreateQuestionsDto {
+  @IsString()
+  lessonId: string;
+
+  @IsString()
+  text: string;
+}
