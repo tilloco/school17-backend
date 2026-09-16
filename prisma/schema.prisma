@@ -116,6 +116,7 @@ model Question {
   // Milliy sertifikat mock imtihoni uchun qo'shimcha maydonlar
   questionType  QuestionType @default(CLOSED)
   difficulty    Int          @default(1) // 1 yoki 2 - yopiq savol ballini aniqlaydi (1.3 yoki 2.2)
+    concept       String?      // savol mavzusi, masalan: "mulk_huquqi"
   partAPrompt   String?      @db.Text // faqat OPEN turi uchun
   partAAnswer   String?      @db.Text // namunaviy javob (AI shu bilan solishtiradi)
   partBPrompt   String?      @db.Text

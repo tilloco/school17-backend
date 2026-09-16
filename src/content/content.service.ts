@@ -96,6 +96,7 @@ export class ContentService {
           correctIndex: q.correctIndex,
           explanation: q.explanation,
           difficulty: q.difficulty,
+           concept: q.concept,
         };
       }),
     });
@@ -161,11 +162,12 @@ export class ContentService {
         };
       }
 
-      let questionText = '';
+          let questionText = '';
       const options: string[] = [];
       let correctLetter = '';
       let explanation = '';
       let difficulty = 1;
+      let concept = '';
 
       for (const line of lines) {
         const qMatch = line.match(/^Q:\s*(.+)$/i);
@@ -173,12 +175,14 @@ export class ContentService {
         const correctMatch = line.match(/^CORRECT:\s*([A-D])\s*$/i);
         const explainMatch = line.match(/^EXPLAIN:\s*(.+)$/i);
         const difficultyMatch = line.match(/^DIFFICULTY:\s*([12])\s*$/i);
+        const conceptMatch = line.match(/^CONCEPT:\s*(.+)$/i);
 
         if (qMatch) questionText = qMatch[1].trim();
         else if (optMatch) options.push(optMatch[2].trim());
         else if (correctMatch) correctLetter = correctMatch[1].toUpperCase();
         else if (explainMatch) explanation = explainMatch[1].trim();
         else if (difficultyMatch) difficulty = parseInt(difficultyMatch[1], 10);
+        else if (conceptMatch) concept = conceptMatch[1].trim();
       }
 
       if (!questionText) throw new BadRequestException(`${label}: "Q:" qatori topilmadi`);
@@ -198,6 +202,7 @@ export class ContentService {
         correctIndex,
         explanation,
         difficulty,
+        concept:concept || null,
       };
     });
   }
