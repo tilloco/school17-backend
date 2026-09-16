@@ -76,13 +76,17 @@ export class ExamService {
     return this.buildSessionPayload(session.id);
   }
 
-  private async pickRandom(type: 'CLOSED' | 'OPEN', count: number) {
-    return this.prisma.$queryRawUnsafe<{ id: string }[]>(
-      `SELECT id FROM "Question" WHERE "questionType" = $1 ORDER BY RANDOM() LIMIT $2`,
-      type,
-      count,
-    );
+ private async pickRandom(type: 'CLOSED' | 'OPEN', count: number) {
+  const all = await this.prisma.question.findMany({
+    where: { questionType: type },
+    select: { id: true },
+  });
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [all[i], all[j]] = [all[j], all[i]];
   }
+  return all.slice(0, count);
+}
 
   private async buildSessionPayload(sessionId: string) {
     const session = await this.prisma.examSession.findUniqueOrThrow({

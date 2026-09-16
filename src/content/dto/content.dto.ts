@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsArray, ArrayMinSize, ArrayMaxSize, Min, IsOptional} from 'class-validator';
+import { IsString, IsInt, IsArray, ArrayMinSize, ArrayMaxSize, Min, IsOptional } from 'class-validator';
 
 export class CreateModuleDto {
   @IsString()
@@ -55,14 +55,17 @@ export class CreateQuestionDto {
 
   @IsString()
   explanation: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  concepts?: string[];
 }
+
 export class BulkCreateQuestionsDto {
   @IsString()
   lessonId: string;
 
   @IsString()
   text: string;
-    @IsOptional()
-  @IsString()
-  concept?: string;
 }
