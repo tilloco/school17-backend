@@ -5,12 +5,13 @@ import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { ReferralService } from '../referral/referral.service';
+import { OAuth2Client } from 'google-auth-library';
 
 const OTP_TTL_MS = 5 * 60 * 1000; // 5 daqiqa
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000; // bir emailga 60 soniyada 1 marta so'rov
 const OTP_MAX_PER_HOUR = 5; // bir emailga soatiga maksimal nechta kod yuborish mumkin
 const OTP_MAX_VERIFY_ATTEMPTS = 5; // bitta kod uchun noto'g'ri urinishlar limiti
-
+private googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 @Injectable()
 export class AuthService {
   constructor(
@@ -87,6 +88,40 @@ export class AuthService {
       where: { email, usedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
     });
+    // Google orqali kirish: mobil ilova Google'dan olgan idToken'ni tekshiramiz,
+// foydalanuvchini topamiz yoki yangi yaratamiz, JWT qaytaramiz.
+async loginWithGoogle(idToken: string): Promise<{ accessToken: string; isNewUser: boolean }> {
+  const ticket = await this.googleClient.verifyIdToken({
+    idToken,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+
+  const payload = ticket.getPayload();
+  if (!payload || !payload.email) {
+    throw new BadRequestException("Google tokeni noto'g'ri");
+  }
+
+  const email = payload.email.toLowerCase();
+  const name = payload.name;
+
+  let user = await this.prisma.user.findUnique({ where: { email } });
+  let isNewUser = false;
+
+  if (!user) {
+    isNewUser = true;
+    user = await this.prisma.user.create({
+      data: {
+        email,
+        name,
+        referralCode: this.generateReferralCode(),
+        streak: { create: { currentCount: 0 } },
+      },
+    });
+  }
+
+  const accessToken = this.jwt.sign({ sub: user.id, email: user.email });
+  return { accessToken, isNewUser };
+}
 
     if (!otp) {
       throw new BadRequestException("Kod noto'g'ri yoki muddati o'tgan");

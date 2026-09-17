@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -25,4 +26,10 @@ export class AuthController {
   verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto.email, dto.code, dto.name, dto.referredByCode);
   }
+  // POST /auth/google  { "idToken": "..." }
+@Throttle({ default: { limit: 10, ttl: 60_000 } })
+@Post('google')
+loginWithGoogle(@Body() dto: GoogleLoginDto) {
+  return this.authService.loginWithGoogle(dto.idToken);
+}
 }

@@ -36,7 +36,7 @@ export class ExamService {
   }
 
   async start(userId: string) {
-    await this.assertPremium(userId);
+
 
     const existing = await this.prisma.examSession.findFirst({
       where: { userId, status: 'IN_PROGRESS' },
