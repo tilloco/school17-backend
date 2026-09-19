@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ContentService } from './content.service';
-import { AdminJwtAuthGuard } from '../admin-auth/admin-jwt-auth.guard';
+import { AdminApiKeyGuard } from '../admin-auth/admin-api-key.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateModuleDto, CreateWeekDto, CreateLessonDto, CreateQuestionDto, BulkCreateQuestionsDto } from './dto/content.dto';
 
@@ -32,48 +32,48 @@ export class ContentController {
 
   // --- Faqat admin (header: x-admin-key) ---
 
-  @UseGuards(AdminJwtAuthGuard)
+  @UseGuards(AdminApiKeyGuard)
   @Post('modules')
   createModule(@Body() dto: CreateModuleDto) {
     return this.contentService.createModule(dto);
   }
 
-  @UseGuards(AdminJwtAuthGuard)
+  @UseGuards(AdminApiKeyGuard)
   @Post('weeks')
   createWeek(@Body() dto: CreateWeekDto) {
     return this.contentService.createWeek(dto);
   }
 
-  @UseGuards(AdminJwtAuthGuard)
+  @UseGuards(AdminApiKeyGuard)
   @Post('lessons')
   createLesson(@Body() dto: CreateLessonDto) {
     return this.contentService.createLesson(dto);
   }
-  @UseGuards(AdminJwtAuthGuard)
+  @UseGuards(AdminApiKeyGuard)
   @Post('questions')
   createQuestion(@Body() dto: CreateQuestionDto) {
     return this.contentService.createQuestion(dto);
   }
 
   // Bitta lessonId + katta matn bo'lagi (bir nechta savol) - tezkor ommaviy qo'shish uchun
-  @UseGuards(AdminJwtAuthGuard)
+  @UseGuards(AdminApiKeyGuard)
   @Post('questions/bulk')
   createQuestionsBulk(@Body() dto: BulkCreateQuestionsDto) {
     return this.contentService.createQuestionsBulk(dto);
   }
   // Admin panelida modul → hafta → dars daraxtini ko'rish uchun (savol qo'shishda dars tanlash)
-  @UseGuards(AdminJwtAuthGuard)
+  @UseGuards(AdminApiKeyGuard)
   @Get('admin/modules')
   listModulesAdmin() {
     return this.contentService.listModules();
   }
-  @UseGuards(AdminJwtAuthGuard)
+  @UseGuards(AdminApiKeyGuard)
   @Delete('lessons/:id')
   deleteLesson(@Param('id') id: string) {
     return this.contentService.deleteLesson(id);
   }
 
-  @UseGuards(AdminJwtAuthGuard)
+  @UseGuards(AdminApiKeyGuard)
   @Delete('questions/:id')
   deleteQuestion(@Param('id') id: string) {
     return this.contentService.deleteQuestion(id);
