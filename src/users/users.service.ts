@@ -52,42 +52,15 @@ export class UsersService {
     return { avatarUrl: updated.avatarUrl };
   }
 
-  // Dashboard uchun: umumiy progress foizi, streak, zaif mavzular
+  // Dashboard uchun: topshirilgan mock imtihonlar soni
   async getDashboard(userId: string) {
-    const totalLessons = await this.prisma.lesson.count();
-    const completedLessons = await this.prisma.userProgress.count({
-      where: { userId },
+    const EXAMS_GOAL = 10;
+    const examsTaken = await this.prisma.examSession.count({
+      where: { userId, status: 'COMPLETED' },
     });
-
-    const streak = await this.prisma.streak.findUnique({ where: { userId } });
-
-    // Har bir darsning to'g'ri javob foizini hisoblab, eng past foizlilarini "zaif mavzu" deb belgilaymiz
-    const answers = await this.prisma.userAnswer.findMany({
-      where: { userId },
-      include: { question: { include: { lesson: { include: { week: { include: { module: true } } } } } } },
-    });
-
-    const byModule: Record<string, { correct: number; total: number; title: string }> = {};
-    for (const a of answers) {
-      const moduleTitle = a.question.lesson.week.module.title;
-      if (!byModule[moduleTitle]) byModule[moduleTitle] = { correct: 0, total: 0, title: moduleTitle };
-      byModule[moduleTitle].total += 1;
-      if (a.isCorrect) byModule[moduleTitle].correct += 1;
-    }
-
-    const weakTopics = Object.values(byModule)
-      .map((m) => ({ title: m.title, correctPercent: Math.round((m.correct / m.total) * 100) }))
-      .sort((a, b) => a.correctPercent - b.correctPercent)
-      .slice(0, 3);
-
-    return {
-      progressPercent: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
-      completedLessons,
-      totalLessons,
-      streak: streak?.currentCount ?? 0,
-      weakTopics,
-    };
+    return { examsTaken, examsGoal: EXAMS_GOAL };
   }
+
     // Xabar yozish uchun foydalanuvchini ism yoki email bo'yicha qidirish
   async searchUsers(currentUserId: string, query: string) {
     if (!query.trim()) return [];
@@ -112,3 +85,4 @@ export class UsersService {
     return users;
   }
 }
+

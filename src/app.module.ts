@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -15,7 +15,6 @@ import { AiModule } from './ai/ai.module';
 import { AdminAuthModule } from './admin-auth/admin-auth.module';
 import { AdminModule } from './admin/admin.module';
 import { ExamModule } from './exam/exam.module';
-import { MessagingModule } from './messaging/messaging.module'; // ← add here, with the others
 
 @Module({
   imports: [
@@ -43,7 +42,6 @@ import { MessagingModule } from './messaging/messaging.module'; // ← add here,
     AdminModule,
     OnboardingModule,
     ExamModule,
-    MessagingModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

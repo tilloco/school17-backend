@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+﻿import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateModuleDto, CreateWeekDto, CreateLessonDto, CreateQuestionDto, BulkCreateQuestionsDto } from './dto/content.dto';
 
@@ -96,7 +96,7 @@ export class ContentService {
           correctIndex: q.correctIndex,
           explanation: q.explanation,
           difficulty: q.difficulty,
-           concept: q.concept,
+           concepts: q.concept ? [q.concept] : [],
         };
       }),
     });
