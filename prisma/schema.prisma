@@ -297,23 +297,6 @@ model AiRecommendation {
   @@index([userId])
 }
 
-// SMS OTP kodlarini vaqtincha saqlash uchun
-// XAVFSIZLIK: kod ochiq matnda emas, HMAC-SHA256 hash sifatida saqlanadi (OTP_PEPPER bilan) -
-// shunda DB sizib chiqsa ham amaldagi kodlarni to'g'ridan-to'g'ri ishlatib bo'lmaydi.
-// "attempts" - noto'g'ri urinishlar soni, MAX_VERIFY_ATTEMPTS dan oshsa kod bekor qilinadi (brute-force himoyasi).
-model OtpCode {
-  id        String    @id @default(uuid())
-  email     String
-  codeHash  String
-  attempts  Int       @default(0)
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@index([email])
-  @@index([email, createdAt])
-}
-
 model OnboardingSession {
   id        String   @id @default(cuid())
   userId    String   @unique
