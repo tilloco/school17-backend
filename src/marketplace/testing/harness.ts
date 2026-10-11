@@ -250,6 +250,26 @@ export async function makeThread(t: TestApp, teacher: { user: TestUser; profileI
   return { threadId: th.body.id as string, bookingId: b.body.id as string };
 }
 
+/** To'g'ridan-to'g'ri DB ga tasdiqlangan o'qituvchi yozadi (ommaviy testlar uchun tez). */
+export async function seedVerifiedTeacher(
+  t: TestApp,
+  o: { tag: string; subjects?: string[]; levels?: string[]; languages?: string[]; priceMinor?: number; ratingSum?: number; ratingCount?: number; instant?: boolean; status?: 'VERIFIED' | 'PENDING' | 'SUSPENDED' | 'REJECTED'; userStatus?: 'ACTIVE' | 'SUSPENDED'; verifiedAt?: Date; rules?: { weekday: number; startMinute: number; endMinute: number }[] },
+) {
+  const user = await makeUser(t, Role.TEACHER, { name: `T ${o.tag} ${counter}`, status: o.userStatus as any });
+  const count = o.ratingCount ?? 0;
+  const sum = o.ratingSum ?? 0;
+  const prior = 4.2, weight = 5;
+  const p = await t.prisma.teacherProfile.create({
+    data: {
+      userId: user.id, headline: `Tutor ${o.tag}`, bio: `Bio ${o.tag} `.repeat(10), subjects: o.subjects ?? ['math'], levels: o.levels ?? ['grades_10_11'], languages: o.languages ?? ['uz'],
+      priceMinor: o.priceMinor ?? 5_000_000, instantBooking: o.instant ?? false, verificationStatus: o.status ?? 'VERIFIED', verifiedAt: o.verifiedAt ?? new Date(),
+      ratingCount: count, ratingSum: sum, ratingBayes: (prior * weight + sum) / (weight + count),
+      availability: { create: (o.rules ?? [1, 2, 3, 4, 5].map((weekday) => ({ weekday, startMinute: 540, endMinute: 1080 }))) },
+    },
+  });
+  return { user, profileId: p.id };
+}
+
 export interface RouteSpec {
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   path: string;

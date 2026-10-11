@@ -79,6 +79,7 @@ export class TeachersService {
             subjects: (data.subjects as string[]) ?? [],
             levels: (data.levels as string[]) ?? [],
             languages: (data.languages as string[]) ?? [],
+            ratingBayes: cfg.ratingPriorMean,
             user: { connect: { id: actor.id } },
           },
         });

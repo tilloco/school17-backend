@@ -6,6 +6,8 @@ import { FilesService } from './files/files.service';
 import { FilesAdminController, FilesController, FilesStorageController } from './files/files.controller';
 import { LocalDiskStorage, OBJECT_STORAGE } from './files/storage';
 import { createScanProvider, SCAN_PROVIDER } from './files/scanner';
+import { DiscoveryService } from './discovery/discovery.service';
+import { DiscoveryController } from './discovery/discovery.controller';
 import { MessagingService } from './messaging/messaging.service';
 import { MessagingController } from './messaging/messaging.controller';
 import { MessagingGateway } from './messaging/messaging.gateway';
@@ -33,9 +35,9 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     JwtModule.registerAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (c: ConfigService) => ({ secret: c.get<string>('JWT_SECRET') }) }),
   ],
   // Tartib muhim: 'teachers/me' controller'i 'teachers/:id' dan oldin turishi kerak
-  controllers: [AccountController, AuditController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
+  controllers: [AccountController, AuditController, DiscoveryController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
   providers: [
-    RealtimeService, MessagingGateway, MessagingService, FilesService,
+    DiscoveryService, RealtimeService, MessagingGateway, MessagingService, FilesService,
     { provide: OBJECT_STORAGE, useFactory: () => new LocalDiskStorage(process.env.FILES_DIR || join(process.cwd(), 'uploads-private')) },
     { provide: SCAN_PROVIDER, useFactory: () => createScanProvider() },
     DomainEvents, { provide: CALL_PROVIDER, useFactory: () => createCallProvider() }, CallsService, ClockService, GuardianService, NotificationsService, BookingService, AuditService, AccountService, TeachersService, UserActorGuard, AdminActorGuard],
