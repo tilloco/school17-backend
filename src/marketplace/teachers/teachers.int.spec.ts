@@ -151,4 +151,13 @@ describe('teacher profiles (integration)', () => {
     const s = await makeUser(t, Role.STUDENT);
     assert.equal((await api(t, s.token).put('/teachers/me/profile', GOOD_PROFILE)).status, 403);
   });
+
+  it('a verified profile can be viewed by pupil, guardian, teacher (any) and by admin through the admin route', async () => {
+    const { profileId } = await makeTeacher(t, { approve: { adminToken: admin.token } });
+    const viewers = [await makeUser(t, Role.STUDENT), await makeUser(t, Role.GUARDIAN), await makeUser(t, Role.TEACHER)];
+    for (const v of viewers) assert.equal((await api(t, v.token).get('/teachers/' + profileId)).status, 200, v.role);
+    assert.equal((await api(t, admin.token).get('/admin/market/teachers/' + profileId)).status, 200, 'admin');
+    assert.equal((await api(t, admin.token).get('/teachers/' + profileId)).status, 401, 'admin tokens are for admin routes only');
+    assert.equal((await api(t).get('/teachers/' + profileId)).status, 401, 'anonymous');
+  });
 });

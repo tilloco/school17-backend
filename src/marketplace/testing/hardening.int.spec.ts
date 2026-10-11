@@ -53,7 +53,7 @@ describe('route inventory (static): every endpoint is guarded and permissioned',
   });
   it('the public controllers expose only the documented endpoints', () => {
     const pub = classes.filter((c) => PUBLIC_CLASSES.has(c.name)).flatMap((c) => c.handlers.map((h) => `${c.name}: ${h.line}`));
-    assert.equal(pub.length, 8, pub.join('\n')); // 4 legal/tips GET + 1 guardian-statement + upload PUT + blob GET + webhook POST
+    assert.equal(pub.length, 7, pub.join(String.fromCharCode(10))); // terms, privacy, guardian-statement, safety tips, upload PUT, blob GET, call webhook POST
   });
 });
 
