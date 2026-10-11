@@ -238,12 +238,14 @@ export class FilesService {
     const user = await this.prisma.user.findUnique({ where: { id: uid }, select: { status: true } });
     const admin = user ? null : await this.prisma.admin.findUnique({ where: { id: uid }, select: { id: true } });
     if (!(user && user.status === 'ACTIVE') && !admin) throw new ForbiddenException('Forbidden');
+    // Saqlashda bayt yo'q bo'lsa (o'chirilgan/yo'qolgan) 500 emas, 404
+    const read = (key: string) => this.storage.get(key).catch(() => { throw new NotFoundException('Not found'); });
     if (variant === 'thumb') {
       if (!file.thumbKey) throw new NotFoundException('No thumbnail');
-      return { data: await this.storage.get(file.thumbKey), mime: 'image/webp', name: 'thumb.webp' };
+      return { data: await read(file.thumbKey), mime: 'image/webp', name: 'thumb.webp' };
     }
     if (variant !== 'original') throw new NotFoundException('Not found');
-    return { data: await this.storage.get(`${file.storageKey}/blob`), mime: file.finalMime ?? 'application/octet-stream', name: file.originalName };
+    return { data: await read(`${file.storageKey}/blob`), mime: file.finalMime ?? 'application/octet-stream', name: file.originalName };
   }
 
   // ---------- boshqaruv ----------

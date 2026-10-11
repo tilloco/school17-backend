@@ -86,6 +86,23 @@ export class AccountService {
     return { role: target };
   }
 
+  /** Administrator uchun foydalanuvchilarni qidirish (ism/email bo'yicha). Email faqat administratorga ko'rinadi. */
+  async adminSearchUsers(q: { text?: string; role?: string; status?: string; skip: number; take: number }) {
+    const take = Math.min(Math.max(q.take, 1), 50);
+    const where: Record<string, unknown> = {};
+    if (q.text?.trim()) {
+      const text = q.text.trim().slice(0, 80);
+      where.OR = [{ name: { contains: text, mode: 'insensitive' } }, { email: { contains: text, mode: 'insensitive' } }];
+    }
+    if (q.role && ['STUDENT', 'GUARDIAN', 'TEACHER', 'ADMIN'].includes(q.role)) where.role = q.role;
+    if (q.status && ['ACTIVE', 'SUSPENDED', 'DELETED'].includes(q.status)) where.status = q.status;
+    const [total, rows] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: Math.max(0, q.skip), take, select: { id: true, name: true, email: true, role: true, status: true, createdAt: true, teacherProfile: { select: { id: true, verificationStatus: true } } } }),
+    ]);
+    return { total, items: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, role: r.role, status: r.status, createdAt: r.createdAt, teacherProfileId: r.teacherProfile?.id ?? null, verificationStatus: r.teacherProfile?.verificationStatus ?? null })) };
+  }
+
   async listAudit(skip: number, take: number, action?: string) {
     return this.prisma.auditLog.findMany({
       where: action ? { action } : undefined,

@@ -4,6 +4,7 @@ import { ReportReason, ReportStatus, ReportTargetType } from '@prisma/client';
 import { IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 import { Actor } from '../common/actor';
 import { AdminActorGuard, CurrentActor, RequirePermission, UserActorGuard } from '../common/actor.guard';
+import { AccountService } from '../account/account.service';
 import { ReportsService } from '../moderation/reports.service';
 import { ReviewsService } from './reviews.service';
 
@@ -66,7 +67,12 @@ export class ReviewsController {
 @Controller('admin/market')
 @UseGuards(AdminActorGuard)
 export class ModerationAdminController {
-  constructor(private reports: ReportsService, private reviews: ReviewsService) {}
+  constructor(private reports: ReportsService, private reviews: ReviewsService, private account: AccountService) {}
+
+  @Get('users') @RequirePermission('moderation.review')
+  users(@Query('q') q?: string, @Query('role') role?: string, @Query('status') status?: string, @Query('skip') skip = '0', @Query('take') take = '20') {
+    return this.account.adminSearchUsers({ text: q, role, status, skip: Number(skip) || 0, take: Number(take) || 20 });
+  }
 
   @Get('reports') @RequirePermission('moderation.review')
   queue(@Query('status') status?: string, @Query('targetType') type?: string, @Query('skip') skip = '0', @Query('take') take = '30') {

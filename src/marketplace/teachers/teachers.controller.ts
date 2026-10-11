@@ -127,6 +127,12 @@ export class TeachersAdminController {
   @Get(':id') @RequirePermission('teacher.verification.review')
   get(@Param('id', ParseUUIDPipe) id: string) { return this.teachers.adminGet(id); }
 
+  @Post('credentials/:id/approve') @HttpCode(200) @RequirePermission('teacher.verification.review')
+  approveCredential(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.teachers.adminReviewCredential(a, id, true); }
+
+  @Post('credentials/:id/reject') @HttpCode(200) @RequirePermission('teacher.verification.review')
+  rejectCredential(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasonDto) { return this.teachers.adminReviewCredential(a, id, false, dto.reason); }
+
   @Post(':id/approve') @HttpCode(200) @RequirePermission('teacher.verification.review')
   approve(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.teachers.adminTransition(a, id, 'approve'); }
 

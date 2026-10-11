@@ -254,9 +254,27 @@ export class TeachersService {
   }
 
   async adminGet(profileId: string) {
-    const exists = await this.prisma.teacherProfile.findUnique({ where: { id: profileId }, select: { id: true } });
+    const exists = await this.prisma.teacherProfile.findUnique({ where: { id: profileId }, select: { id: true, user: { select: { name: true, email: true } } } });
     if (!exists) throw new NotFoundException('Not found');
-    return this.ownerView(profileId);
+    // Administrator hujjat fayl id'larini ham ko'radi (yuklab olish alohida, audit qilinadigan marshrut orqali)
+    const files = await this.prisma.teacherCredential.findMany({ where: { teacherId: profileId }, select: { id: true, fileId: true } });
+    const view = await this.ownerView(profileId);
+    return { ...view, name: exists.user.name, email: exists.user.email, credentials: view.credentials.map((c) => ({ ...c, fileId: files.find((f) => f.id === c.id)?.fileId })) };
+  }
+
+  /** Bitta hujjatni alohida tasdiqlash/rad etish (o'qituvchi profilining umumiy holatiga tegmaydi). */
+  async adminReviewCredential(actor: Actor, credentialId: string, approve: boolean, reason?: string) {
+    if (actor.kind !== 'admin') throw new ForbiddenException('Forbidden');
+    if (!approve && !reason?.trim()) throw new BadRequestException('Reason required');
+    const c = await this.prisma.teacherCredential.findUnique({ where: { id: credentialId } });
+    if (!c) throw new NotFoundException('Not found');
+    const r = await this.prisma.teacherCredential.updateMany({
+      where: { id: c.id, status: { in: ['PENDING', 'APPROVED', 'REJECTED'] } },
+      data: { status: approve ? 'APPROVED' : 'REJECTED', reviewedAt: new Date(), reviewNote: approve ? null : reason!.trim().slice(0, 500) },
+    });
+    if (r.count === 0) throw new ConflictException('Cannot review');
+    await this.audit.log(actor, { action: approve ? 'credential.approve' : 'credential.reject', targetType: 'TeacherCredential', targetId: c.id, metadata: { reason } });
+    return { id: c.id, status: approve ? 'APPROVED' : 'REJECTED' };
   }
 
   async adminTransition(actor: Actor, profileId: string, event: VerificationEvent, reason?: string) {

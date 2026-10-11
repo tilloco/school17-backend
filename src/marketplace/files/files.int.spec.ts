@@ -3,6 +3,7 @@ import * as assert from 'node:assert/strict';
 import { Role } from '@prisma/client';
 import { ClockService } from '../common/clock';
 import { SCAN_PROVIDER } from './scanner';
+import { OBJECT_STORAGE } from './storage';
 import {
   api, checkRouteMatrix, CHUNK, createTestApp, makeAdmin, makeJpeg, makePdf, makeTeacher, makeThread, makeUser, TestApp, uploadFile,
 } from '../testing/harness';
@@ -284,5 +285,14 @@ describe('files (integration)', () => {
     const f = await uploadFile(t, u, { mime: 'application/pdf', bytes: makePdf() });
     const url = (await api(t, u.token).post('/files/' + f.fileId + '/download-url', {})).body.url as string;
     assert.equal((await fetch(t.baseUrl + url.replace('/original?', '/..%2Foriginal?'))).status, 403);
+  });
+
+  it('a download link whose bytes are gone answers 404, never 500', async () => {
+    const u = await makeUser(t);
+    const f = await uploadFile(t, u, { mime: 'application/pdf', bytes: makePdf() });
+    const row = await t.prisma.storedFile.findUniqueOrThrow({ where: { id: f.fileId } });
+    const url = (await api(t, u.token).post('/files/' + f.fileId + '/download-url', {})).body.url as string;
+    await (t.app.get(OBJECT_STORAGE) as any).deletePrefix(row.storageKey);
+    assert.equal((await fetch(t.baseUrl + url)).status, 404);
   });
 });
