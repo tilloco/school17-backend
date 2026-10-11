@@ -161,6 +161,7 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
     await this.prisma.booking.update({ where: { id }, data: { status: next, decidedAt: this.clock.now(), cancelReason: reason?.slice(0, 300) } });
     await this.audit.log(actor, { action: 'booking.decline', targetType: 'Booking', targetId: id });
     await this.notifications.enqueue(b.bookedById, 'booking.declined', { bookingId: id });
+    await this.events.emit('booking.declined', { bookingId: id });
     return this.get(actor, id);
   }
 
@@ -271,6 +272,7 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
   // ---------- o'qish ----------
 
   async get(actor: Actor, id: string) {
+    await this.expireDue();
     const b = await this.loadFor(actor, id, ['student', 'booker', 'teacher'], true);
     return this.view(actor, b);
   }
@@ -303,7 +305,10 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
     const due = await this.prisma.booking.findMany({ where: { status: 'REQUESTED', requestExpiresAt: { lte: now } }, select: { id: true, bookedById: true } });
     for (const d of due) {
       const r = await this.prisma.booking.updateMany({ where: { id: d.id, status: 'REQUESTED' }, data: { status: 'EXPIRED' } });
-      if (r.count) await this.notifications.enqueue(d.bookedById, 'booking.expired', { bookingId: d.id });
+      if (r.count) {
+        await this.notifications.enqueue(d.bookedById, 'booking.expired', { bookingId: d.id });
+        await this.events.emit('booking.expired', { bookingId: d.id });
+      }
     }
     return due.length;
   }

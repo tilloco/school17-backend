@@ -666,6 +666,7 @@ model Booking {
   outcomeNote      String?
   callRooms        CallRoom[]    @relation("BookingCallRooms")
   review           Review?       @relation("BookingReview")
+  payment          LessonPayment? @relation("BookingPayment")
   completedAt      DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -875,4 +876,100 @@ model Report {
   @@unique([reporterId, targetType, targetId])
   @@index([status, createdAt])
   @@index([targetType, targetId])
+}
+
+
+// ---------------- Marketplace: to'lovlar va daftar (S8) ----------------
+// Pul HAR DOIM butun son, eng kichik birlikda (tiyin; 1 so'm = 100 tiyin). Haqiqiy to'lov provayderi YO'Q: MockPaymentProvider.
+
+enum PaymentState {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  ON_HOLD
+  DISPUTED
+  UNDER_REVIEW
+  RELEASED
+}
+
+model LessonPayment {
+  id             String       @id @default(uuid())
+  bookingId      String       @unique
+  booking        Booking      @relation("BookingPayment", fields: [bookingId], references: [id], onDelete: Restrict)
+  payerId        String
+  teacherUserId  String
+  amountMinor    Int
+  currency       String       @default("UZS")
+  commissionBps  Int
+  state          PaymentState @default(PENDING)
+  provider       String
+  providerRef    String?
+  idempotencyKey String       @unique
+  failureCode    String?
+  earnedMinor    Int          @default(0) // o'qituvchiga hisoblangan (komissiyadan oldin)
+  commissionMinor Int         @default(0)
+  refundedMinor  Int          @default(0)
+  releaseAt      DateTime?
+  disputeReason  String?
+  disputedAt     DateTime?
+  resolutionNote String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([state, releaseAt])
+  @@index([teacherUserId, createdAt])
+  @@index([payerId, createdAt])
+}
+
+enum LedgerAccount {
+  EXTERNAL_PAYMENTS
+  ESCROW
+  TEACHER_PENDING
+  TEACHER_AVAILABLE
+  PAYOUT_PENDING
+  PLATFORM_REVENUE
+  EXTERNAL_PAYOUTS
+}
+
+// Qo'sh yozuvli daftar: har bir txnId bo'yicha yig'indi doim 0. O'zgartirilmaydi, o'chirilmaydi (faqat yangi yozuv).
+model LedgerEntry {
+  id             String        @id @default(uuid())
+  txnId          String
+  account        LedgerAccount
+  ownerId        String?
+  amountMinor    BigInt
+  kind           String
+  bookingId      String?
+  paymentId      String?
+  payoutId       String?
+  idempotencyKey String        @unique
+  createdAt      DateTime      @default(now())
+
+  @@index([account, ownerId])
+  @@index([txnId])
+  @@index([bookingId])
+}
+
+enum PayoutStatus {
+  REQUESTED
+  PAID
+  REJECTED
+}
+
+model PayoutRequest {
+  id              String       @id @default(uuid())
+  teacherUserId   String
+  amountMinor     BigInt
+  destination     String // masalan "Humo ****1234" — to'liq karta raqami SAQLANMAYDI
+  status          PayoutStatus @default(REQUESTED)
+  idempotencyKey  String       @unique
+  providerRef     String?
+  rejectReason    String?
+  reviewedByAdminId String?
+  requestedAt     DateTime     @default(now())
+  paidAt          DateTime?
+
+  @@index([teacherUserId, requestedAt])
+  @@index([status, requestedAt])
 }

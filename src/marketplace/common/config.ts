@@ -41,5 +41,8 @@ export function marketConfig() {
     ratingPriorWeight: Number(process.env.RATING_PRIOR_WEIGHT) || 5,
     // Komissiya (bazis punkt: 1500 = 15%)
     commissionBps: int('PLATFORM_COMMISSION_BPS', 1500),
+    holdHours: int('PAYMENT_HOLD_HOURS', 24), // dars tugagach pul shuncha soat "ushlab turiladi" (nizo oynasi)
+    minPayoutMinor: int('MIN_PAYOUT_MINOR', 5_000_000), // 50 000 so'm
+    paymentRequiredForCalls: process.env.PAYMENT_REQUIRED_FOR_CALLS === 'true',
   };
 }

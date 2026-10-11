@@ -6,6 +6,8 @@ export interface DomainEventMap {
   'booking.completed': { bookingId: string; billableSeconds: number };
   'booking.noshow': { bookingId: string; kind: 'NO_SHOW_STUDENT' | 'NO_SHOW_TEACHER' };
   'booking.failed': { bookingId: string; note: string };
+  'booking.declined': { bookingId: string };
+  'booking.expired': { bookingId: string };
 }
 
 type Handler<K extends keyof DomainEventMap> = (payload: DomainEventMap[K]) => Promise<void> | void;

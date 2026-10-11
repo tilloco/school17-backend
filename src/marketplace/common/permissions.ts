@@ -17,6 +17,8 @@ export const PERMISSIONS = [
   'earnings.view',
   'payout.request',
   'payout.review',
+  'payment.pay',
+  'payment.review',
   'report.create',
   'moderation.review',
   'audit.read',
@@ -28,13 +30,14 @@ export type Permission = (typeof PERMISSIONS)[number];
 const ALL_USERS: Permission[] = ['account.read.self', 'account.delete.self', 'report.create', 'message.send'];
 
 export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
-  STUDENT: new Set<Permission>([...ALL_USERS, 'booking.create', 'booking.participate', 'call.join', 'review.create']),
+  STUDENT: new Set<Permission>([...ALL_USERS, 'booking.create', 'booking.participate', 'call.join', 'review.create', 'payment.pay']),
   GUARDIAN: new Set<Permission>([
     ...ALL_USERS,
     'booking.create',
     'booking.participate',
     'call.join',
     'review.create',
+    'payment.pay',
     'guardian.manage',
   ]),
   TEACHER: new Set<Permission>([
@@ -52,6 +55,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'account.read.self',
     'teacher.verification.review',
     'payout.review',
+    'payment.review',
     'moderation.review',
     'audit.read',
     'report.create',

@@ -11,6 +11,10 @@ import { DiscoveryController } from './discovery/discovery.controller';
 import { ReviewsService } from './reviews/reviews.service';
 import { ModerationAdminController, ReviewsController } from './reviews/reviews.controller';
 import { ReportsService } from './moderation/reports.service';
+import { LedgerService } from './payments/ledger.service';
+import { PaymentsService } from './payments/payments.service';
+import { PaymentsAdminController, PaymentsController } from './payments/payments.controller';
+import { createPaymentProvider, PAYMENT_PROVIDER } from './payments/payment-provider';
 import { MessagingService } from './messaging/messaging.service';
 import { MessagingController } from './messaging/messaging.controller';
 import { MessagingGateway } from './messaging/messaging.gateway';
@@ -38,12 +42,13 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     JwtModule.registerAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (c: ConfigService) => ({ secret: c.get<string>('JWT_SECRET') }) }),
   ],
   // Tartib muhim: 'teachers/me' controller'i 'teachers/:id' dan oldin turishi kerak
-  controllers: [AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
+  controllers: [AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
   providers: [
+    LedgerService, PaymentsService, { provide: PAYMENT_PROVIDER, useFactory: () => createPaymentProvider() },
     ReviewsService, ReportsService, DiscoveryService, RealtimeService, MessagingGateway, MessagingService, FilesService,
     { provide: OBJECT_STORAGE, useFactory: () => new LocalDiskStorage(process.env.FILES_DIR || join(process.cwd(), 'uploads-private')) },
     { provide: SCAN_PROVIDER, useFactory: () => createScanProvider() },
     DomainEvents, { provide: CALL_PROVIDER, useFactory: () => createCallProvider() }, CallsService, ClockService, GuardianService, NotificationsService, BookingService, AuditService, AccountService, TeachersService, UserActorGuard, AdminActorGuard],
-  exports: [ReviewsService, ReportsService, FilesService, MessagingService, RealtimeService, DomainEvents, CALL_PROVIDER, CallsService, ClockService, GuardianService, NotificationsService, BookingService, AuditService, AccountService, TeachersService],
+  exports: [LedgerService, PaymentsService, PAYMENT_PROVIDER, ReviewsService, ReportsService, FilesService, MessagingService, RealtimeService, DomainEvents, CALL_PROVIDER, CallsService, ClockService, GuardianService, NotificationsService, BookingService, AuditService, AccountService, TeachersService],
 })
 export class MarketplaceModule {}

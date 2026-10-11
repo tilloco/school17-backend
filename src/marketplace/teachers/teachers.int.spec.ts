@@ -72,8 +72,14 @@ describe('teacher profiles (integration)', () => {
     const student = await makeUser(t, Role.STUDENT);
     assert.ok(isDenied((await api(t, student.token).get('/teachers/' + profileId)).status), 'PENDING must be hidden');
 
-    const queue = await api(t, admin.token).get('/admin/market/teachers/queue');
-    assert.ok(queue.body.some((r: any) => r.id === profileId));
+    // Navbat eng eskisidan boshlanadi; umumiy test bazasida ko'p yozuv bo'lgani uchun sahifalab qidiramiz
+    let found = false;
+    for (let skip = 0; !found && skip < 5000; skip += 100) {
+      const page = await api(t, admin.token).get('/admin/market/teachers/queue?take=100&skip=' + skip);
+      if (!page.body.length) break;
+      found = page.body.some((r: any) => r.id === profileId);
+    }
+    assert.ok(found, 'new submission appears in the admin review queue');
 
     // o'qituvchi o'zini tasdiqlay olmaydi
     assert.equal((await api(t, user.token).post('/admin/market/teachers/' + profileId + '/approve')).status, 401);
