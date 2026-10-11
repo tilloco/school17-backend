@@ -52,14 +52,24 @@ export class UsersService {
     return { avatarUrl: updated.avatarUrl };
   }
 
-  // Dashboard uchun: topshirilgan mock imtihonlar soni
-  async getDashboard(userId: string) {
-    const EXAMS_GOAL = 10;
-    const examsTaken = await this.prisma.examSession.count({
+  // Dashboard uchun: topshirilgan mock imtihonlar soni + streak
+async getDashboard(userId: string) {
+  const EXAMS_GOAL = 10;
+
+  const [examsTaken, streak] = await Promise.all([
+    this.prisma.examSession.count({
       where: { userId, status: 'COMPLETED' },
-    });
-    return { examsTaken, examsGoal: EXAMS_GOAL };
-  }
+    }),
+    this.prisma.streak.findUnique({ where: { userId } }),
+  ]);
+
+  return {
+    examsTaken,
+    examsGoal: EXAMS_GOAL,
+    streakCurrent: streak?.currentCount ?? 0,
+    streakLongest: streak?.longestCount ?? 0,
+  };
+}
 
     // Xabar yozish uchun foydalanuvchini ism yoki email bo'yicha qidirish
   async searchUsers(currentUserId: string, query: string) {
