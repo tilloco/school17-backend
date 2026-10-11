@@ -6,6 +6,8 @@ import { NestFactory } from '@nestjs/core';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { ActorThrottlerGuard } from '../common/actor-throttler.guard';
 import { randomUUID } from 'crypto';
 import { AccountStatus, PrismaClient, Role } from '@prisma/client';
 import { JwtStrategy } from '../../auth/jwt.strategy';
@@ -44,7 +46,7 @@ export interface TestApp {
   close(): Promise<void>;
 }
 
-export async function createTestApp(extraModules: any[] = []): Promise<TestApp> {
+export async function createTestApp(extraModules: any[] = [], opts: { throttle?: boolean } = {}): Promise<TestApp> {
   loadTestEnv();
   @Module({
     imports: [
@@ -56,7 +58,7 @@ export async function createTestApp(extraModules: any[] = []): Promise<TestApp> 
       MarketplaceModule,
       ...extraModules,
     ],
-    providers: [JwtStrategy, AdminJwtStrategy],
+    providers: [JwtStrategy, AdminJwtStrategy, ...(opts.throttle ? [{ provide: APP_GUARD, useClass: ActorThrottlerGuard }] : [])],
   })
   class TestAppModule {}
 

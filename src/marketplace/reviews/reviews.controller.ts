@@ -80,6 +80,12 @@ export class ModerationAdminController {
   @Post('reports/:id/resolve') @HttpCode(200) @RequirePermission('moderation.review')
   resolve(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ResolveDto) { return this.reports.resolve(a, id, dto.action, dto.note); }
 
+  @Post('users/:id/suspend') @HttpCode(200) @RequirePermission('moderation.review')
+  suspend(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: HideDto) { return this.reports.setUserSuspended(a, id, true, dto.reason ?? 'admin'); }
+
+  @Post('users/:id/reinstate') @HttpCode(200) @RequirePermission('moderation.review')
+  reinstate(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.reports.setUserSuspended(a, id, false, 'reinstated'); }
+
   @Post('reviews/:id/hide') @HttpCode(200) @RequirePermission('moderation.review')
   async hide(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: HideDto) { await this.reviews.setHidden(a, id, true, dto.reason); return { ok: true }; }
 

@@ -3,7 +3,15 @@ import { Throttle } from '@nestjs/throttler';
 import { IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 import { Actor } from '../common/actor';
 import { CurrentActor, RequirePermission, UserActorGuard } from '../common/actor.guard';
+import { ReportReason } from '@prisma/client';
+import { IsEnum } from 'class-validator';
+import { ReportsService } from '../moderation/reports.service';
 import { MessagingService } from './messaging.service';
+
+class ThreadReportDto {
+  @IsEnum(ReportReason) reason!: ReportReason;
+  @IsOptional() @IsString() @MaxLength(1000) note?: string;
+}
 
 class OpenDto {
   @IsUUID() bookingId!: string;
@@ -19,7 +27,15 @@ class SeqDto {
 @Controller('threads')
 @UseGuards(UserActorGuard)
 export class MessagingController {
-  constructor(private messaging: MessagingService) {}
+  constructor(private messaging: MessagingService, private reports: ReportsService) {}
+
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post(':id/report') @HttpCode(201) @RequirePermission('report.create')
+  reportUser(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ThreadReportDto) { return this.reports.createFromThread(a, id, dto); }
+
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post(':id/messages/:messageId/report') @HttpCode(201) @RequirePermission('report.create')
+  reportMessage(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('messageId', ParseUUIDPipe) mid: string, @Body() dto: ThreadReportDto) { return this.reports.createFromThread(a, id, { ...dto, messageId: mid }); }
 
   @Post() @HttpCode(200) @RequirePermission('message.send')
   open(@CurrentActor() a: Actor, @Body() dto: OpenDto) { return this.messaging.openFromBooking(a, dto.bookingId); }

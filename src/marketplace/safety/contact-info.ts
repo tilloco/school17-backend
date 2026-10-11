@@ -4,7 +4,7 @@
 
 export type ContactKind = 'email' | 'url' | 'handle' | 'phone' | 'messenger';
 
-const MESSENGERS = /(telegram|whatsapp|whats\s*app|viber|instagram|insta\b|tiktok|snapchat|skype|discord|facebook|messenger|signal\s+app|imo\b|тг\b|телеграм\w*|ватсап\w*|вотсап\w*|вайбер\w*|инстаграм\w*|инста\b|фейсбук\w*|телега\w*|telegramda|vatsap\w*|instagramda)/i;
+const MESSENGERS = /(telegram|whatsapp|whats\s*app|viber|instagram|insta\b|tiktok|snapchat|skype|discord|facebook|messenger|signal\s+app|imo\b|(?:^|\s)тг(?=$|[\s.,!?])|телеграм\w*|ватсап\w*|вотсап\w*|вайбер\w*|инстаграм\w*|инста\b|фейсбук\w*|телега\w*|telegramda|vatsap\w*|instagramda)/i;
 
 export function detectContactInfo(text: string): { found: boolean; kinds: ContactKind[] } {
   const kinds = new Set<ContactKind>();

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AuditActorType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Actor } from './actor';
+import { ClockService } from './clock';
 
 export interface AuditEntry {
   action: string;
@@ -24,7 +25,7 @@ export function scrubMetadata(meta: Record<string, unknown> | undefined): Prisma
 
 @Injectable()
 export class AuditService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private clock: ClockService) {}
 
   log(actor: Actor | 'SYSTEM', entry: AuditEntry) {
     const system = actor === 'SYSTEM';
@@ -32,6 +33,7 @@ export class AuditService {
       data: {
         actorType: system ? AuditActorType.SYSTEM : actor.kind === 'admin' ? AuditActorType.ADMIN : AuditActorType.USER,
         actorId: system ? null : actor.id,
+        createdAt: this.clock.now(),
         action: entry.action,
         targetType: entry.targetType,
         targetId: entry.targetId,
