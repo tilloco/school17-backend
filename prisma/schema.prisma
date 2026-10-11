@@ -84,6 +84,10 @@ model User {
   chatMessagesSent    ChatMessage[]  @relation("MessageSender")
   reviewsWritten      Review[]       @relation("ReviewAuthor")
   reportsMade         Report[]       @relation("ReportReporter")
+  blocksMade          UserBlock[]    @relation("BlockerSide")
+  blockedBy           UserBlock[]    @relation("BlockedSide")
+  linkCodes           GuardianLinkCode[] @relation("LinkCodeStudent")
+  consents            Consent[]      @relation("UserConsents")
   dailyStudyMinutes   Int?
   selfLevel           String?
   onboardingCompleted Boolean @default(false)
@@ -868,6 +872,7 @@ model Report {
   reason           ReportReason
   note             String           @default("") @db.Text
   status           ReportStatus     @default(OPEN)
+  snapshot         Json? // shikoyat paytidagi kontent nusxasi (keyin o'chirilsa ham admin ko'ra oladi)
   resolutionNote   String?
   resolvedByAdminId String?
   resolvedAt       DateTime?
@@ -972,4 +977,54 @@ model PayoutRequest {
 
   @@index([teacherUserId, requestedAt])
   @@index([status, requestedAt])
+}
+
+
+// ---------------- Marketplace: xavfsizlik, roziliklar (S9/S10) ----------------
+
+model UserBlock {
+  id        String   @id @default(uuid())
+  blockerId String
+  blocker   User     @relation("BlockerSide", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("BlockedSide", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+// Voyaga yetmagan o'quvchi yaratadigan bir martalik kod; vasiy shu kod bilan bog'lanadi. Kod faqat HASH ko'rinishida saqlanadi.
+model GuardianLinkCode {
+  id        String    @id @default(uuid())
+  studentId String
+  student   User      @relation("LinkCodeStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  codeHash  String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([studentId, createdAt])
+}
+
+enum ConsentKind {
+  TERMS
+  PRIVACY
+  GUARDIAN_STATEMENT
+  MARKETING
+}
+
+model Consent {
+  id         String      @id @default(uuid())
+  userId     String
+  user       User        @relation("UserConsents", fields: [userId], references: [id], onDelete: Cascade)
+  kind       ConsentKind
+  version    String
+  locale     String      @default("uz")
+  acceptedAt DateTime    @default(now())
+  withdrawnAt DateTime?
+
+  @@unique([userId, kind, version])
+  @@index([userId, kind])
 }
