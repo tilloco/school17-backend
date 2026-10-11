@@ -13,6 +13,8 @@ export interface ObjectStorage {
   list(prefix: string): Promise<string[]>;
   delete(key: string): Promise<void>;
   deletePrefix(prefix: string): Promise<void>;
+  /** Diskdagi jami/bo'sh joy (bayt). S3 kabi saqlagichlarda bo'lmasligi mumkin. */
+  diskStats?(): Promise<{ totalBytes: number; freeBytes: number }>;
 }
 
 export const OBJECT_STORAGE = Symbol('OBJECT_STORAGE');
@@ -55,6 +57,11 @@ export class LocalDiskStorage implements ObjectStorage {
   }
   async delete(key: string) {
     await fs.rm(this.path(key), { force: true });
+  }
+  async diskStats() {
+    await fs.mkdir(this.root, { recursive: true });
+    const st = await fs.statfs(this.root);
+    return { totalBytes: Number(st.blocks) * Number(st.bsize), freeBytes: Number(st.bavail) * Number(st.bsize) };
   }
   async deletePrefix(prefix: string) {
     await fs.rm(this.path(prefix.replace(/\/$/, '')), { recursive: true, force: true });

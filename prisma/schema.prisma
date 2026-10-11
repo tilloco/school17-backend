@@ -515,6 +515,7 @@ enum StoredFilePurpose {
   CREDENTIAL
   MESSAGE_ATTACHMENT
   AVATAR
+  CLASS_FILE
 }
 
 enum FileScanStatus {
@@ -593,6 +594,7 @@ model TeacherProfile {
   credentials  TeacherCredential[]
   bookings     Booking[]           @relation("TeacherBookings")
   classes      Class[]             @relation("TeacherClasses")
+  storageQuotaMb      Int? // admin tomonidan oshirilgan kvota (MB); bo'sh = standart
   reviews      Review[]            @relation("TeacherReviews")
   paymentInfo  TeacherPaymentInfo?
 
@@ -857,6 +859,7 @@ enum ReportTargetType {
   REVIEW
   USER
   MESSAGE
+  CLASS_FILE
 }
 
 enum ReportReason {
@@ -867,6 +870,7 @@ enum ReportReason {
   FAKE
   PERSONAL_DATA
   SAFETY
+  COPYRIGHT
   OTHER
 }
 
@@ -1205,6 +1209,8 @@ model ClassSession {
   endReason     String?
   participants  ClassParticipant[]
   messages      ClassMessage[]
+  presentFileId String?
+  presentPage   Int                @default(1)
   questions     ClassQuestion[]
   attendance    ClassAttendance[]
   createdAt     DateTime           @default(now())
@@ -1338,4 +1344,40 @@ model ClassMute {
   until     DateTime
 
   @@unique([sessionId, pupilId])
+}
+
+enum ClassFileRender {
+  PREPARING
+  READY
+  FAILED
+}
+
+model ClassFile {
+  id            String          @id @default(uuid())
+  classId       String
+  fileId        String          @unique // StoredFile (CLASS_FILE, PDF)
+  uploaderId    String
+  name          String
+  allowDownload Boolean         @default(true)
+  pageCount     Int             @default(0)
+  renderedPages Int             @default(0)
+  renderStatus  ClassFileRender @default(PREPARING)
+  renderError   String?
+  renderAttempts Int            @default(0)
+  takedownAt    DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([classId, deletedAt])
+}
+
+// Sahifadagi o'qituvchi chizmalari (vektor): { strokes: [{ c: '#rrggbb', w: number, p: [[x,y],...] }] }, koordinatalar 0..1
+model ClassAnnotation {
+  id          String   @id @default(uuid())
+  classFileId String
+  page        Int
+  data        Json
+  updatedAt   DateTime
+
+  @@unique([classFileId, page])
 }

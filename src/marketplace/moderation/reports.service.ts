@@ -116,7 +116,13 @@ export class ReportsService {
     if (r.status !== 'OPEN') throw new ConflictException('Report already resolved');
     if (action === 'ACTION') {
       if (r.targetType === 'REVIEW') await this.reviews.setHidden(admin, r.targetId, true, note ?? `report:${r.reason}`);
-      else if (r.targetType === 'MESSAGE') await this.prisma.chatMessage.updateMany({ where: { id: r.targetId }, data: { deletedAt: this.clock.now() } });
+      else if (r.targetType === 'MESSAGE') {
+        await this.prisma.chatMessage.updateMany({ where: { id: r.targetId }, data: { deletedAt: this.clock.now() } });
+        await this.prisma.classMessage.updateMany({ where: { id: r.targetId, deletedAt: null }, data: { deletedAt: this.clock.now() } }); // sinf chati (R3)
+      } else if (r.targetType === 'CLASS_FILE') {
+        await this.prisma.classFile.updateMany({ where: { id: r.targetId }, data: { takedownAt: this.clock.now() } });
+        await this.prisma.classSession.updateMany({ where: { presentFileId: r.targetId }, data: { presentFileId: null, presentPage: 1 } });
+      }
       else if (r.targetType === 'USER') await this.setUserSuspended(admin, r.targetId, true, note ?? `report:${r.reason}`);
     }
     const updated = await this.prisma.report.update({

@@ -157,9 +157,16 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
       lobbyOpensAt: new Date(s.startAt.getTime() - cfg.classLobbyMinutes * 60_000),
       stageMode: s.stageMode, chatMode: s.chatMode, questionsMode: s.questionsMode, slowModeSeconds: s.slowModeSeconds, handRaiseOn: s.handRaiseOn, locked: s.locked, spotlightPupilId: s.spotlightPupilId,
       teacherReconnecting: s.status === 'LIVE' && !!s.teacherAbsentSince, teacherNoShow: s.teacherNoShow, endReason: s.endReason,
+      presentation: await this.presentation(s),
       stageCount, stageMax: cfg.classMaxStagePupils,
       me: teacher ? null : { handRaised: !!me?.handRaisedAt, stage: me?.stage ?? 'NONE', removed: !!me?.removedAt },
     };
+  }
+
+  private async presentation(s: ClassSession) {
+    if (!s.presentFileId) return null;
+    const f = await this.prisma.classFile.findFirst({ where: { id: s.presentFileId, deletedAt: null, takedownAt: null } });
+    return f ? { fileId: f.id, name: f.name, page: s.presentPage, pageCount: f.pageCount, renderedPages: f.renderedPages, renderStatus: f.renderStatus } : null;
   }
 
   // ---------- qo'l ko'tarish va sahna ----------

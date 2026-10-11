@@ -23,7 +23,7 @@ const ALLOWED_DECLARED_MIME: Record<string, DetectedType> = {
   'application/pdf': 'pdf',
 };
 
-const PURPOSES_FOR_USERS: StoredFilePurpose[] = ['CREDENTIAL', 'MESSAGE_ATTACHMENT', 'AVATAR', 'PAYMENT_PROOF'];
+const PURPOSES_FOR_USERS: StoredFilePurpose[] = ['CREDENTIAL', 'MESSAGE_ATTACHMENT', 'AVATAR', 'PAYMENT_PROOF', 'CLASS_FILE'];
 
 const newKey = () => `f_${randomBytes(16).toString('hex')}`;
 
@@ -56,14 +56,23 @@ export class FilesService {
     const type = ALLOWED_DECLARED_MIME[input.mime];
     if (!type) throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
     if ((input.purpose === 'AVATAR' || input.purpose === 'PAYMENT_PROOF') && type === 'pdf') throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
-    const limit = input.purpose === 'PAYMENT_PROOF' ? cfg.fileMaxProofBytes : type === 'pdf' ? cfg.fileMaxPdfBytes : cfg.fileMaxImageBytes;
+    if (input.purpose === 'CLASS_FILE' && (actor.role !== 'TEACHER' || type !== 'pdf')) throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
+    const limit = input.purpose === 'CLASS_FILE' ? cfg.classFileMaxBytes : input.purpose === 'PAYMENT_PROOF' ? cfg.fileMaxProofBytes : type === 'pdf' ? cfg.fileMaxPdfBytes : cfg.fileMaxImageBytes;
     if (!Number.isInteger(input.size) || input.size <= 0) throw new BadRequestException('Bad size');
     if (input.size > limit) throw new PayloadTooLargeException({ message: 'File too large', code: 'FILE_TOO_LARGE', limitBytes: limit });
 
     await this.sweepPending(actor.id);
+    // Disk himoyasi: bo'sh joy chegaradan past bo'lsa hech qanday yangi yuklash qabul qilinmaydi
+    const disk = await this.storage.diskStats?.();
+    if (disk && disk.freeBytes - input.size < cfg.diskMinFreeBytes) throw new HttpException({ message: 'The server is low on disk space. Try again later.', code: 'DISK_LOW' }, 503);
     const used = await this.usedBytes(actor.id);
-    if (used + input.size > cfg.fileUserQuotaBytes) {
-      throw new HttpException({ message: 'Storage quota exceeded', code: 'QUOTA_EXCEEDED', usedBytes: used, quotaBytes: cfg.fileUserQuotaBytes }, 413);
+    let quota = cfg.fileUserQuotaBytes;
+    if (input.purpose === 'CLASS_FILE') {
+      const tp = await this.prisma.teacherProfile.findUnique({ where: { userId: actor.id }, select: { storageQuotaMb: true } });
+      quota = tp?.storageQuotaMb ? tp.storageQuotaMb * 1024 * 1024 : cfg.teacherStorageQuotaBytes;
+    }
+    if (used + input.size > quota) {
+      throw new HttpException({ message: 'Storage quota exceeded', code: 'QUOTA_EXCEEDED', usedBytes: used, quotaBytes: quota }, 413);
     }
     const file = await this.prisma.storedFile.create({
       data: {
@@ -205,6 +214,13 @@ export class FilesService {
       if (!m || m.deletedAt) return false;
       if (m.thread.teacherUserId === actor.id || m.thread.studentUserId === actor.id) return true;
       if (actor.role === 'GUARDIAN' && (await this.guardians.isActiveGuardianOf(actor.id, m.thread.studentUserId))) return true;
+    }
+    if (file.purpose === 'CLASS_FILE') {
+      // Sinf PDF'ini asl holida faqat o'qituvchi (egasi) yoki, agar o'qituvchi ruxsat bergan bo'lsa, sinf a'zolari yuklab oladi
+      const cf = await this.prisma.classFile.findFirst({ where: { fileId: file.id, deletedAt: null, takedownAt: null, allowDownload: true }, select: { classId: true } });
+      if (!cf) return false;
+      const seats = actor.role === 'GUARDIAN' ? await this.guardians.linkedStudentIds(actor.id) : [actor.id];
+      return !!(await this.prisma.classEnrollment.findFirst({ where: { classId: cf.classId, pupilId: { in: seats }, status: 'ACTIVE' }, select: { id: true } }));
     }
     if (file.purpose === 'PAYMENT_PROOF') {
       // Kvitansiya: faqat to'lov egasi (yuklagan), o'qituvchi, o'quvchi/bronlovchi va o'quvchining vasiysi ko'radi (admin - alohida audit qilinadigan yo'l)
