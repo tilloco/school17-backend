@@ -158,6 +158,7 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
       stageMode: s.stageMode, chatMode: s.chatMode, questionsMode: s.questionsMode, slowModeSeconds: s.slowModeSeconds, handRaiseOn: s.handRaiseOn, locked: s.locked, spotlightPupilId: s.spotlightPupilId,
       teacherReconnecting: s.status === 'LIVE' && !!s.teacherAbsentSince, teacherNoShow: s.teacherNoShow, endReason: s.endReason,
       presentation: await this.presentation(s),
+      whiteboardRev: s.whiteboardRev,
       stageCount, stageMax: cfg.classMaxStagePupils,
       me: teacher ? null : { handRaised: !!me?.handRaisedAt, stage: me?.stage ?? 'NONE', removed: !!me?.removedAt },
     };

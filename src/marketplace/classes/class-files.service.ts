@@ -22,15 +22,15 @@ const pageKey = (cfId: string, size: PageSize, n: number) => `classfiles/${cfId}
 export interface Stroke { c: string; w: number; p: [number, number][] }
 
 /** Annotatsiya (vektor) tekshiruvi: rang, qalinlik, koordinatalar 0..1, hajm chegaralari */
-export function validateStrokes(input: unknown): Stroke[] {
-  if (!Array.isArray(input) || input.length > MAX_STROKES) throw new BadRequestException(`At most ${MAX_STROKES} strokes`);
+export function validateStrokes(input: unknown, lim = { strokes: MAX_STROKES, perStroke: MAX_POINTS_PER_STROKE, total: MAX_POINTS_TOTAL }): Stroke[] {
+  if (!Array.isArray(input) || input.length > lim.strokes) throw new BadRequestException(`At most ${lim.strokes} strokes`);
   let total = 0;
   return input.map((s: any) => {
     if (!s || typeof s !== 'object' || typeof s.c !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(s.c)) throw new BadRequestException('Bad stroke colour');
     if (typeof s.w !== 'number' || !(s.w >= 0.5 && s.w <= 20)) throw new BadRequestException('Bad stroke width');
-    if (!Array.isArray(s.p) || s.p.length < 1 || s.p.length > MAX_POINTS_PER_STROKE) throw new BadRequestException('Bad stroke points');
+    if (!Array.isArray(s.p) || s.p.length < 1 || s.p.length > lim.perStroke) throw new BadRequestException('Bad stroke points');
     total += s.p.length;
-    if (total > MAX_POINTS_TOTAL) throw new BadRequestException('Too many points');
+    if (total > lim.total) throw new BadRequestException('Too many points');
     const p = s.p.map((pt: any) => {
       if (!Array.isArray(pt) || pt.length !== 2 || !pt.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1)) throw new BadRequestException('Bad point');
       return [Math.round(pt[0] * 10000) / 10000, Math.round(pt[1] * 10000) / 10000] as [number, number];

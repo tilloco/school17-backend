@@ -1210,6 +1210,7 @@ model ClassSession {
   participants  ClassParticipant[]
   messages      ClassMessage[]
   presentFileId String?
+  whiteboardRev Int                @default(0)
   presentPage   Int                @default(1)
   questions     ClassQuestion[]
   attendance    ClassAttendance[]
@@ -1380,4 +1381,30 @@ model ClassAnnotation {
   updatedAt   DateTime
 
   @@unique([classFileId, page])
+}
+
+enum ClassFeedKind {
+  WHITEBOARD
+}
+
+// Teacher doskasining oxirgi holati (vektor); yangi qo'shilgan va qayta ulangan mijozlar shuni oladi
+model ClassWhiteboard {
+  sessionId String   @id
+  rev       Int      @default(0)
+  data      Json
+  updatedAt DateTime
+}
+
+// Sinf lentasi (R8 kengaytiradi): hozircha doskadan saqlangan PNG
+model ClassFeedPost {
+  id        String        @id @default(uuid())
+  classId   String
+  sessionId String?
+  kind      ClassFeedKind
+  authorId  String
+  text      String?
+  imageKey  String?
+  createdAt DateTime
+
+  @@index([classId, createdAt])
 }
