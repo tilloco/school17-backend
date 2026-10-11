@@ -81,31 +81,38 @@ describe('two-browser video call smoke test (real WebRTC, mock signaling)', { sk
     assert.ok(s1.remoteW > 0 && s2.remoteW > 0, 'both sides render remote video');
     console.log(`    smoke: join times ms teacher=${s1.joinMs} pupil=${s2.joinMs} (local loopback, NOT a network measurement)`);
 
-    // Tarmoq uzilishi: p2 ulanishni tashlaydi va avtomatik qayta ulanadi
-    await p2.evaluate(() => (window as any).__drop());
-    assert.equal((await p2.evaluate(() => (window as any).__state())).banner, 'reconnecting');
-    const back = await waitState(p2, 'connected', 25_000);
-    assert.equal(back.reconnects, 1);
-    assert.ok(back.remoteW > 0);
+    try {
+      // Tarmoq uzilishi: p2 ulanishni tashlaydi va avtomatik qayta ulanadi
+      await p2.evaluate(() => (window as any).__drop());
+      assert.equal((await p2.evaluate(() => (window as any).__state())).banner, 'reconnecting');
+      const back = await waitState(p2, 'connected', 25_000);
+      assert.equal(back.reconnects, 1);
+      assert.ok(back.remoteW > 0);
 
-    // Dars vaqti o'tadi: heartbeat'lar bilan 06:00 gacha, so'ng ikkalasi chiqadi
-    clock.set(at('05:30:00'));
-    await p1.evaluate(() => (window as any).__heartbeat());
-    await p2.evaluate(() => (window as any).__heartbeat());
-    clock.set(at('06:00:00'));
-    await p1.evaluate(() => (window as any).__heartbeat());
-    await p2.evaluate(() => (window as any).__heartbeat());
-    await p1.evaluate(() => (window as any).__leave());
-    await p2.evaluate(() => (window as any).__leave());
-    await sleep(800);
+      // Dars vaqti o'tadi: heartbeat'lar bilan 06:00 gacha, so'ng ikkalasi chiqadi
+      clock.set(at('05:30:00'));
+      await p1.evaluate(() => (window as any).__heartbeat());
+      await p2.evaluate(() => (window as any).__heartbeat());
+      clock.set(at('06:00:00'));
+      await p1.evaluate(() => (window as any).__heartbeat());
+      await p2.evaluate(() => (window as any).__heartbeat());
+      await p1.evaluate(() => (window as any).__leave());
+      await p2.evaluate(() => (window as any).__leave());
+      await sleep(800);
 
-    const sum = (await api(t, student.token).get('/calls/' + b.id + '/summary')).body;
-    assert.equal(sum.status, 'COMPLETED');
-    assert.equal(sum.billableSeconds, 3600, 'billable is capped at the scheduled hour');
-    const events = await t.prisma.callEvent.findMany({ where: { bookingId: b.id } });
-    assert.ok(events.some((e) => e.type === 'rejoined'), 'reconnect was recorded');
-    assert.ok(events.some((e) => e.type === 'quality'));
-
+      const sum = (await api(t, student.token).get('/calls/' + b.id + '/summary')).body;
+      assert.equal(sum.status, 'COMPLETED');
+      assert.equal(sum.billableSeconds, 3600, 'billable is capped at the scheduled hour');
+      const events = await t.prisma.callEvent.findMany({ where: { bookingId: b.id } });
+      assert.ok(events.some((e) => e.type === 'rejoined'), 'reconnect was recorded');
+      assert.ok(events.some((e) => e.type === 'quality'));
+    } catch (e) {
+      // Vaqti-vaqti bilan (to'liq to'plamda) uchraydigan nosozlik uchun tashxis: sahifalar holati va server voqealari
+      const dump = async (pg: any) => JSON.stringify(await pg.evaluate(() => (window as any).__state()).catch(() => 'n/a')).slice(0, 1500);
+      const ev = await t.prisma.callEvent.findMany({ where: { bookingId: b.id }, orderBy: { at: 'asc' } });
+      console.error('SMOKE DIAGNOSTICS P1', await dump(p1), 'P2', await dump(p2), 'EVENTS', ev.map((x) => x.type).join(','));
+      throw e;
+    }
     // Boshqa foydalanuvchi signalizatsiyaga ham, tokenga ham ega emas
     const outsider = await makeUser(t);
     clock.set(at('04:58:00'));

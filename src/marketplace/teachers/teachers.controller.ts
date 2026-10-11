@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
 import { CredentialKind, VerificationStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
@@ -6,6 +6,7 @@ import {
 } from 'class-validator';
 import { Actor } from '../common/actor';
 import { AdminActorGuard, CurrentActor, RequirePermission, UserActorGuard } from '../common/actor.guard';
+import { FilesService } from '../files/files.service';
 import { TeachersService } from './teachers.service';
 
 class ProfileDto {
@@ -24,6 +25,9 @@ class RuleDto {
   @IsInt() weekday!: number;
   @Matches(/^\d{2}:\d{2}$/) start!: string;
   @Matches(/^\d{2}:\d{2}$/) end!: string;
+}
+class PhotoDto {
+  @IsUUID() fileId!: string;
 }
 class AvailabilityDto {
   @IsArray() @ArrayMaxSize(70) @ValidateNested({ each: true }) @Type(() => RuleDto) rules!: RuleDto[];
@@ -76,6 +80,12 @@ export class TeachersMeController {
   @Delete('credentials/:id') @RequirePermission('teacher.profile.manage')
   removeCredential(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.teachers.removeCredential(a, id); }
 
+  @Put('photo') @RequirePermission('teacher.profile.manage')
+  setPhoto(@CurrentActor() a: Actor, @Body() dto: PhotoDto) { return this.teachers.setPhoto(a, dto.fileId); }
+
+  @Delete('photo') @RequirePermission('teacher.profile.manage')
+  removePhoto(@CurrentActor() a: Actor) { return this.teachers.removePhoto(a); }
+
   @Post('submit') @HttpCode(200) @RequirePermission('teacher.profile.manage')
   submit(@CurrentActor() a: Actor) { return this.teachers.submit(a); }
 }
@@ -84,10 +94,23 @@ export class TeachersMeController {
 @Controller('teachers')
 @UseGuards(UserActorGuard)
 export class TeachersPublicController {
-  constructor(private teachers: TeachersService) {}
+  constructor(private teachers: TeachersService, private files: FilesService) {}
 
   @Get(':id') @RequirePermission('booking.participate')
   get(@Param('id', ParseUUIDPipe) id: string) { return this.teachers.publicProfile(id); }
+
+  /** Profil surati (eskiz). Mobil Image komponenti Authorization sarlavhasi bilan oladi. Brauzerda inline ko'rsatilmaydi (attachment + sandbox). */
+  @Get(':id/photo') @RequirePermission('booking.participate')
+  async photo(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Res() res: any) {
+    const f = await this.teachers.photoFile(a, id);
+    const data = await this.files.readThumb(f);
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Content-Disposition', 'attachment; filename="photo.webp"');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.status(200).end(data);
+  }
 }
 
 @Controller('admin/market/teachers')

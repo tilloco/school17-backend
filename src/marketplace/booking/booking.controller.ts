@@ -62,6 +62,11 @@ export class BookingController {
     return this.bookings.proposeReschedule(a, id, new Date(dto.startAt));
   }
 
+  @Post('bookings/:id/counter-offer') @HttpCode(200) @RequirePermission('booking.participate')
+  counterOffer(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RescheduleDto) {
+    return this.bookings.counterOffer(a, id, new Date(dto.startAt));
+  }
+
   @Post('bookings/:id/reschedule/accept') @HttpCode(200) @RequirePermission('booking.participate')
   acceptReschedule(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.bookings.respondReschedule(a, id, true); }
 

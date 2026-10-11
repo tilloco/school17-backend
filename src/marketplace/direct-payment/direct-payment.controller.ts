@@ -34,3 +34,12 @@ export class DirectPaymentController {
   @Post('waive') @HttpCode(200) @RequirePermission('directpay.confirm')
   waive(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.dp.waive(a, id); }
 }
+
+@Controller('teachers/me/money')
+@UseGuards(UserActorGuard)
+export class TeacherMoneyController {
+  constructor(private dp: DirectPaymentService) {}
+
+  @Get('summary') @RequirePermission('directpay.confirm')
+  summary(@CurrentActor() a: Actor) { return this.dp.teacherSummary(a); }
+}

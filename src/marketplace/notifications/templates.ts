@@ -62,6 +62,11 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     ru: { title: 'Этот урок бесплатный', body: 'За этот урок платить не нужно.' },
     en: { title: 'This lesson is free', body: 'No payment is needed for this lesson.' },
   },
+  'booking.counter_offer': {
+    uz: { title: "O'qituvchi boshqa vaqt taklif qildi", body: "O'qituvchi dars uchun boshqa vaqt taklif qildi. Qabul qiling yoki rad eting." },
+    ru: { title: 'Преподаватель предложил другое время', body: 'Преподаватель предложил другое время для урока. Примите или отклоните.' },
+    en: { title: 'The teacher suggested another time', body: 'The teacher suggested a different time for your lesson. Accept or decline it.' },
+  },
   'guardian.linked': {
     uz: { title: 'Vasiy bog\'landi', body: 'Hisobingizga vasiy bog\'landi. U yozishmalaringizni o\'qiy oladi.' },
     ru: { title: 'Опекун привязан', body: 'К вашему аккаунту привязан опекун. Он может читать вашу переписку.' },

@@ -129,6 +129,7 @@ export class DiscoveryService {
         priceMinor: p.priceMinor,
         currency: p.currency,
         instantBooking: p.instantBooking,
+        hasPhoto: !!p.photoFileId,
         verified: true,
         rating: { count: p.ratingCount, average: p.ratingCount ? p.ratingSum / p.ratingCount : null, bayesian: Math.round(p.ratingBayes * 100) / 100 },
         ...(nextSlots?.has(p.id) ? { nextSlot: nextSlots.get(p.id) } : {}),

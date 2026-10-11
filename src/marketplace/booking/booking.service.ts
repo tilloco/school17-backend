@@ -214,6 +214,28 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
     return this.get(actor, id);
   }
 
+  /**
+   * O'qituvchi hali javob bermagan SO'ROVGA (REQUESTED) boshqa vaqt taklif qiladi. O'quvchi tomon qabul qilsa dars shu vaqtga ko'chib
+   * tasdiqlanadi; rad etsa so'rov o'z holicha qoladi (o'qituvchi rad etishi mumkin).
+   */
+  async counterOffer(actor: Actor, id: string, newStart: Date) {
+    const cfg = marketConfig();
+    await this.expireDue();
+    const b = await this.loadFor(actor, id, ['teacher']);
+    const now = this.clock.now();
+    if (b.status !== 'REQUESTED') throw new ConflictException('Only pending requests can get a counter-offer');
+    const problem = startTimeProblem(newStart, now, cfg);
+    if (problem) throw new BadRequestException(problem);
+    await this.assertSlotFree(b, newStart);
+    await this.prisma.booking.update({
+      where: { id },
+      data: { proposedStartAt: newStart, proposedById: actor.id, requestExpiresAt: new Date(Math.min(now.getTime() + cfg.requestExpiryHours * 3_600_000, newStart.getTime())) },
+    });
+    await this.notifications.enqueue(b.bookedById, 'booking.counter_offer', { bookingId: id });
+    await this.audit.log(actor, { action: 'booking.counter_offer', targetType: 'Booking', targetId: id });
+    return this.get(actor, id);
+  }
+
   async respondReschedule(actor: Actor, id: string, accept: boolean) {
     const b = await this.loadFor(actor, id, ['student', 'booker', 'teacher']);
     if (!b.proposedStartAt || !b.proposedById) throw new ConflictException('No pending proposal');
@@ -226,6 +248,23 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
     }
     if (iAmProposerSide) throw new ForbiddenException('The other party must accept');
     const now = this.clock.now();
+    if (b.status === 'REQUESTED') {
+      // O'qituvchining qarshi taklifi qabul qilindi: yangi vaqtda tasdiqlanadi
+      if (b.requestExpiresAt && b.requestExpiresAt <= now) throw new ConflictException('Request expired');
+      if (b.proposedStartAt.getTime() < now.getTime() + marketConfig().minNoticeMinutes * 60_000) throw new ConflictException('Proposal is no longer valid');
+      await this.assertSlotFree(b, b.proposedStartAt);
+      const end = new Date(b.proposedStartAt.getTime() + b.durationMin * 60_000);
+      let updated: Booking;
+      try {
+        updated = await this.prisma.booking.update({ where: { id }, data: { startAt: b.proposedStartAt, endAt: end, status: 'CONFIRMED', decidedAt: now, requestExpiresAt: null, proposedStartAt: null, proposedById: null } });
+      } catch (e) {
+        this.rethrowConflict(e);
+        throw e;
+      }
+      await this.audit.log(actor, { action: 'booking.counter_offer_accept', targetType: 'Booking', targetId: id });
+      await this.onConfirmed(updated, b.teacher.userId);
+      return this.get(actor, id);
+    }
     if (b.status !== 'CONFIRMED' || b.proposedStartAt.getTime() < now.getTime() + marketConfig().minNoticeMinutes * 60_000) {
       throw new ConflictException('Proposal is no longer valid');
     }

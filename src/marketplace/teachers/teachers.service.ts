@@ -114,6 +114,34 @@ export class TeachersService {
     return rows.map((r) => ({ weekday: r.weekday, start: formatHHMM(r.startMinute), end: formatHHMM(r.endMinute) }));
   }
 
+  async setPhoto(actor: Actor, fileId: string) {
+    const p = await this.ownProfileOrThrow(actor);
+    const f = await this.prisma.storedFile.findFirst({ where: { id: fileId, ownerId: actor.id, deletedAt: null } });
+    if (!f) throw new NotFoundException('File not found'); // boshqa birovning faylini ulab bo'lmaydi
+    if (f.purpose !== 'AVATAR') throw new BadRequestException('File has wrong purpose');
+    if (f.status !== 'READY' || !f.thumbKey) throw new ConflictException('File is not a ready image');
+    await this.prisma.teacherProfile.update({ where: { id: p.id }, data: { photoFileId: f.id } });
+    return { hasPhoto: true };
+  }
+
+  async removePhoto(actor: Actor) {
+    const p = await this.ownProfileOrThrow(actor);
+    await this.prisma.teacherProfile.update({ where: { id: p.id }, data: { photoFileId: null } });
+    return { hasPhoto: false };
+  }
+
+  /** Surat faylini qaytaradi: tasdiqlangan o'qituvchi (hamma ko'radi) yoki o'zi. Aks holda 404. */
+  async photoFile(actor: Actor, profileId: string) {
+    const p = await this.prisma.teacherProfile.findFirst({
+      where: { id: profileId, photoFileId: { not: null }, OR: [{ userId: actor.id }, { verificationStatus: VerificationStatus.VERIFIED, user: { status: 'ACTIVE' } }] },
+      select: { photoFileId: true },
+    });
+    if (!p?.photoFileId) throw new NotFoundException('Not found');
+    const f = await this.prisma.storedFile.findFirst({ where: { id: p.photoFileId, deletedAt: null, status: 'READY' } });
+    if (!f?.thumbKey) throw new NotFoundException('Not found');
+    return f;
+  }
+
   async addTimeOff(actor: Actor, startAt: Date, endAt: Date, reason?: string) {
     const p = await this.ownProfileOrThrow(actor);
     if (!(startAt < endAt)) throw new BadRequestException('Invalid range');
@@ -196,6 +224,7 @@ export class TeachersService {
       introVideoUrl: p.introVideoUrl,
       instantBooking: p.instantBooking,
       paymentTiming: p.paymentTiming,
+      hasPhoto: !!p.photoFileId,
       // Karta raqami hech qachon ommaviy javobda yo'q; faqat "mavjud" belgisi (raqam dars qabul qilingandan keyin alohida ochiladi)
       paymentInfoAvailable: (await this.prisma.teacherPaymentInfo.count({ where: { teacherId: p.id } })) > 0,
       verified: true,
@@ -285,6 +314,7 @@ export class TeachersService {
       introVideoUrl: p.introVideoUrl,
       instantBooking: p.instantBooking,
       paymentTiming: p.paymentTiming,
+      hasPhoto: !!p.photoFileId,
       verificationStatus: p.verificationStatus,
       verifiedAt: p.verifiedAt,
       rejectionReason: p.rejectionReason,

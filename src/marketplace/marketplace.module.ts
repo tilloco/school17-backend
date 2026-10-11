@@ -24,7 +24,7 @@ import { NotificationsController } from './notifications/notifications.controlle
 import { PaymentInfoService } from './teachers/payment-info.service';
 import { PaymentInfoMeController, PaymentInfoRevealController } from './teachers/payment-info.controller';
 import { DirectPaymentService } from './direct-payment/direct-payment.service';
-import { DirectPaymentController } from './direct-payment/direct-payment.controller';
+import { DirectPaymentController, TeacherMoneyController } from './direct-payment/direct-payment.controller';
 import { MessagingService } from './messaging/messaging.service';
 import { MessagingController } from './messaging/messaging.controller';
 import { MessagingGateway } from './messaging/messaging.gateway';
@@ -52,7 +52,7 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     JwtModule.registerAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (c: ConfigService) => ({ secret: c.get<string>('JWT_SECRET') }) }),
   ],
   // Tartib muhim: 'teachers/me' controller'i 'teachers/:id' dan oldin turishi kerak
-  controllers: [DirectPaymentController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
+  controllers: [DirectPaymentController, TeacherMoneyController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
   providers: [
     DirectPaymentService,
     PaymentInfoService,

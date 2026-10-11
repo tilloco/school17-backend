@@ -98,6 +98,17 @@ export class DirectPaymentService implements OnModuleInit {
     };
   }
 
+  /** O'qituvchi uchun qisqa hisobot (A4 kengaytiradi): to'lanmagan o'tgan darslar va tasdiq kutayotganlar. */
+  async teacherSummary(actor: Actor) {
+    if (actor.role !== Role.TEACHER) throw new ForbiddenException('Forbidden');
+    const mine = { teacher: { userId: actor.id }, isTrial: false };
+    const [unpaid, awaiting] = await Promise.all([
+      this.prisma.directPayment.count({ where: { status: { in: ['UNPAID', 'NOT_RECEIVED'] }, booking: { ...mine, status: { in: ['COMPLETED', 'NO_SHOW_STUDENT'] } } } }),
+      this.prisma.directPayment.count({ where: { status: 'PUPIL_MARKED_PAID', booking: mine } }),
+    ]);
+    return { unpaidLessons: unpaid, awaitingConfirmation: awaiting };
+  }
+
   // ---------- o'zgartirish ----------
 
   private async transition(actor: Actor, bookingId: string, side: Side, event: DirectEvent, extra: Partial<DirectPayment> = {}, reason?: string) {

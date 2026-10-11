@@ -271,6 +271,12 @@ export class FilesService {
     return rows.length;
   }
 
+  /** Profil surati eskizi (imzosiz ichki o'qish: chaqiruvchi ruxsatni tekshirgan bo'lishi shart). */
+  async readThumb(file: StoredFile): Promise<Buffer> {
+    if (!file.thumbKey) throw new NotFoundException('No thumbnail');
+    return this.storage.get(file.thumbKey);
+  }
+
   async quota(actor: Actor) {
     return { usedBytes: await this.usedBytes(actor.id), quotaBytes: marketConfig().fileUserQuotaBytes };
   }

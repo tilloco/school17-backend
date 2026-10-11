@@ -573,6 +573,7 @@ model TeacherProfile {
   introVideoUrl      String?
   instantBooking     Boolean            @default(false)
   paymentTiming      PaymentTiming      @default(PAY_AFTER)
+  photoFileId        String? // StoredFile (AVATAR) — profil surati
   verificationStatus VerificationStatus @default(DRAFT)
   verifiedAt         DateTime?
   verifiedByAdminId  String?
