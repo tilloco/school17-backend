@@ -79,6 +79,9 @@ model User {
   bookingsAsStudent   Booking[]      @relation("BookingStudent")
   bookingsMade        Booking[]      @relation("BookingBookedBy")
   notifications       Notification[] @relation("UserNotifications")
+  threadsAsTeacher    ChatThread[]   @relation("ThreadTeacher")
+  threadsAsStudent    ChatThread[]   @relation("ThreadStudent")
+  chatMessagesSent    ChatMessage[]  @relation("MessageSender")
   dailyStudyMinutes   Int?
   selfLevel           String?
   onboardingCompleted Boolean @default(false)
@@ -503,6 +506,13 @@ enum StoredFilePurpose {
   AVATAR
 }
 
+enum FileScanStatus {
+  NOT_SCANNED
+  CLEAN
+  INFECTED
+  ERROR
+}
+
 enum StoredFileStatus {
   PENDING_UPLOAD
   UPLOADED
@@ -522,9 +532,20 @@ model StoredFile {
   declaredSize Int               @default(0)
   storageKey   String            @unique
   sha256       String?
+  finalMime    String?
+  scanStatus   FileScanStatus    @default(NOT_SCANNED)
+  thumbKey     String?
+  width        Int?
+  height       Int?
+  pageCount    Int?
+  chunkSize    Int               @default(1048576)
+  completedAt  DateTime?
+  deletedAt    DateTime?
+  rejectReason String?
   status       StoredFileStatus  @default(PENDING_UPLOAD)
   createdAt    DateTime          @default(now())
   credentials  TeacherCredential[]
+  messages     ChatMessage[]
 
   @@index([ownerId, createdAt])
 }
@@ -741,4 +762,43 @@ model CallEvent {
   at        DateTime @default(now())
 
   @@index([bookingId, at])
+}
+
+
+// ---------------- Marketplace: xabarlar (S5) ----------------
+
+model ChatThread {
+  id                   String        @id @default(uuid())
+  teacherUserId        String
+  teacher              User          @relation("ThreadTeacher", fields: [teacherUserId], references: [id], onDelete: Cascade)
+  studentUserId        String // o'quvchi (voyaga yetmagan bo'lsa ham o'zi)
+  student              User          @relation("ThreadStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lastSeq              Int           @default(0)
+  lastMessageAt        DateTime?
+  teacherLastReadSeq   Int           @default(0)
+  studentLastReadSeq   Int           @default(0)
+  teacherDeliveredSeq  Int           @default(0)
+  studentDeliveredSeq  Int           @default(0)
+  createdAt            DateTime      @default(now())
+  messages             ChatMessage[]
+
+  @@unique([teacherUserId, studentUserId])
+  @@index([studentUserId])
+}
+
+model ChatMessage {
+  id        String     @id @default(uuid())
+  threadId  String
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  seq       Int
+  senderId  String
+  sender    User       @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  body      String     @default("") @db.Text
+  fileId    String?    @unique
+  file      StoredFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  createdAt DateTime   @default(now())
+  deletedAt DateTime?
+
+  @@unique([threadId, seq])
+  @@index([senderId, createdAt])
 }

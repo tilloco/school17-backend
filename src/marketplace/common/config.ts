@@ -24,6 +24,16 @@ export function marketConfig() {
     minLessonSeconds: int('CALL_MIN_LESSON_SECONDS', 300), // shundan kam birga bo'lish = dars o'tmagan
     presentMinSeconds: int('CALL_PRESENT_MIN_SECONDS', 60), // shuncha turgan tomon "keldi" hisoblanadi
     presenceStaleSeconds: int('CALL_PRESENCE_STALE_SECONDS', 45),
+    // Fayllar
+    fileMaxImageBytes: int('FILE_MAX_IMAGE_BYTES', 10 * 1024 * 1024),
+    fileMaxPdfBytes: int('FILE_MAX_PDF_BYTES', 50 * 1024 * 1024),
+    fileUserQuotaBytes: int('FILE_USER_QUOTA_BYTES', 500 * 1024 * 1024),
+    fileChunkBytes: 1024 * 1024,
+    uploadUrlTtlSeconds: int('FILE_UPLOAD_URL_TTL_SECONDS', 900),
+    downloadUrlTtlSeconds: int('FILE_DOWNLOAD_URL_TTL_SECONDS', 120),
+    pendingUploadMaxAgeHours: int('FILE_PENDING_MAX_AGE_HOURS', 24),
+    // true bo'lsa va skaner sozlanmagan/xato bersa fayl KARANTINga tushadi (fail closed)
+    fileScanRequired: process.env.FILE_SCAN_REQUIRED === 'true',
     // Komissiya (bazis punkt: 1500 = 15%)
     commissionBps: int('PLATFORM_COMMISSION_BPS', 1500),
   };

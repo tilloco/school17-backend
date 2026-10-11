@@ -33,6 +33,7 @@ export function loadTestEnv(): void {
   process.env.JWT_SECRET = TEST_JWT_SECRET;
   process.env.ADMIN_JWT_SECRET = TEST_ADMIN_JWT_SECRET;
   process.env.NODE_ENV = 'test';
+  process.env.FILES_DIR = process.env.FILES_DIR || require('path').join(process.cwd(), 'uploads-test');
 }
 
 export interface TestApp {
@@ -202,6 +203,51 @@ export async function makeTeacher(t: TestApp, opts: { submit?: boolean; approve?
   if (opts.submit || opts.approve) await c.post('/teachers/me/submit');
   if (opts.approve) await api(t, opts.approve.adminToken).post(`/admin/market/teachers/${prof.body.id}/approve`);
   return { user, profileId: prof.body.id as string };
+}
+
+/** Minimal haqiqiy PDF (sahifasi bor, faol kontentsiz); `padTo` bayt gacha izoh bilan to'ldiriladi. */
+export function makePdf(opts: { padTo?: number; extra?: string } = {}): Buffer {
+  const head = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\n' + (opts.extra ?? '');
+  const tail = 'trailer<</Root 1 0 R>>\n%%EOF\n';
+  let body = head;
+  if (opts.padTo && opts.padTo > head.length + tail.length) body += '%' + 'x'.repeat(opts.padTo - head.length - tail.length - 2) + '\n';
+  return Buffer.from(body + tail, 'latin1');
+}
+
+export async function makeJpeg(width = 64, height = 32, withExif = true): Promise<Buffer> {
+  const sharp = require('sharp');
+  let p = sharp({ create: { width, height, channels: 3, background: { r: 200, g: 30, b: 30 } } });
+  if (withExif) p = p.withMetadata({ orientation: 6 }).withExif({ IFD0: { Copyright: 'SECRET-OWNER-NAME' }, IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '41/1 18/1 0/1', GPSLongitudeRef: 'E', GPSLongitude: '69/1 16/1 0/1' } });
+  return p.jpeg().toBuffer();
+}
+
+export const CHUNK = 1024 * 1024;
+
+/** To'liq yuklash oqimi: init -> bo'laklar (PUT, imzolangan URL) -> complete. `skip` — yuborilmaydigan bo'laklar. */
+export async function uploadFile(
+  t: TestApp,
+  user: TestUser,
+  f: { name?: string; mime: string; bytes: Buffer; purpose?: string; skip?: number[]; noComplete?: boolean },
+) {
+  const c = api(t, user.token);
+  const init = await c.post('/files/init', { purpose: f.purpose ?? 'MESSAGE_ATTACHMENT', name: f.name ?? 'file', size: f.bytes.length, mime: f.mime });
+  if (init.status !== 201) return { init, complete: undefined as any, fileId: undefined as any };
+  const { fileId, parts } = init.body;
+  for (const p of parts) {
+    if (f.skip?.includes(p.index)) continue;
+    const r = await fetch(t.baseUrl + p.url, { method: 'PUT', headers: { 'content-type': 'application/octet-stream' }, body: f.bytes.subarray(p.index * CHUNK, (p.index + 1) * CHUNK) as any });
+    if (r.status !== 200) throw new Error('chunk upload failed ' + r.status + ' ' + (await r.text()));
+  }
+  const complete = f.noComplete ? undefined : await c.post(`/files/${fileId}/complete`);
+  return { init, complete, fileId: fileId as string };
+}
+
+export async function makeThread(t: TestApp, teacher: { user: TestUser; profileId: string }, student: TestUser, startAt = '2026-11-03T05:00:00.000Z') {
+  const b = await api(t, student.token).post('/bookings', { teacherId: teacher.profileId, startAt, durationMin: 60 });
+  if (b.status !== 201) throw new Error('booking failed ' + b.status + JSON.stringify(b.body));
+  const th = await api(t, student.token).post('/threads', { bookingId: b.body.id });
+  if (th.status !== 200) throw new Error('thread failed ' + th.status + JSON.stringify(th.body));
+  return { threadId: th.body.id as string, bookingId: b.body.id as string };
 }
 
 export interface RouteSpec {
