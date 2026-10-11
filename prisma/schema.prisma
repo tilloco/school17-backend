@@ -40,7 +40,40 @@ enum WithdrawalStatus {
   PAID
 }
 
+enum Role {
+  STUDENT
+  GUARDIAN
+  TEACHER
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum GuardianLinkStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+enum AuditActorType {
+  USER
+  ADMIN
+  SYSTEM
+}
+
 model User {
+  role                Role          @default(STUDENT)
+  dateOfBirth         DateTime?
+  locale              String        @default("uz")
+  timezone            String        @default("Asia/Tashkent")
+  status              AccountStatus @default(ACTIVE)
+  deletedAt           DateTime?
+  guardianLinksAsGuardian GuardianLink[] @relation("GuardianSide")
+  guardianLinksAsStudent  GuardianLink[] @relation("StudentSide")
   dailyStudyMinutes   Int?
   selfLevel           String?
   onboardingCompleted Boolean @default(false)
@@ -405,4 +438,33 @@ model Message {
   createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+model GuardianLink {
+  id         String             @id @default(uuid())
+  guardianId String
+  guardian   User               @relation("GuardianSide", fields: [guardianId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    User               @relation("StudentSide", fields: [studentId], references: [id], onDelete: Cascade)
+  status     GuardianLinkStatus @default(PENDING)
+  createdAt  DateTime           @default(now())
+
+  @@unique([guardianId, studentId])
+  @@index([studentId])
+}
+
+// Append-only: servislar faqat create qiladi, hech qachon update/delete qilmaydi.
+model AuditLog {
+  id         String         @id @default(uuid())
+  actorType  AuditActorType
+  actorId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime       @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
 }

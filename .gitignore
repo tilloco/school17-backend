@@ -3,3 +3,5 @@ dist
 .env
 *.tsbuildinfo
 .expo/
+.devdb/
+uploads-test/
