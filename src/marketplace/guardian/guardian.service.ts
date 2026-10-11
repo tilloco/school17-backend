@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Actor, ADULT_AGE, ageInYears } from '../common/actor';
 import { AuditService } from '../common/audit.service';
 import { ClockService } from '../common/clock';
+import { LegalService } from '../legal/legal.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 0/O, 1/I chalkashtirmaydigan
@@ -17,7 +18,7 @@ const hash = (code: string) => createHash('sha256').update('guardian-code:' + co
 
 @Injectable()
 export class GuardianService {
-  constructor(private prisma: PrismaService, private clock: ClockService, private audit: AuditService, private notifications: NotificationsService) {}
+  constructor(private prisma: PrismaService, private clock: ClockService, private audit: AuditService, private notifications: NotificationsService, private legal: LegalService) {}
 
   async isActiveGuardianOf(guardianId: string, studentId: string): Promise<boolean> {
     const link = await this.prisma.guardianLink.findUnique({ where: { guardianId_studentId: { guardianId, studentId } } });
@@ -49,6 +50,7 @@ export class GuardianService {
   async redeem(actor: Actor, rawCode: string) {
     if (actor.role !== Role.GUARDIAN) throw new ForbiddenException('Forbidden');
     if (!actor.ageKnown || actor.isMinor) throw new ForbiddenException('Guardians must be adults with a known date of birth');
+    if (!(await this.legal.hasAccepted(actor.id, 'GUARDIAN_STATEMENT'))) throw new ForbiddenException({ message: 'Accept the guardian statement first', code: 'GUARDIAN_STATEMENT_REQUIRED' });
     const now = this.clock.now();
     const failed = await this.prisma.auditLog.count({ where: { actorId: actor.id, action: 'guardian.redeem_failed', createdAt: { gte: new Date(now.getTime() - 3_600_000) } } });
     if (failed >= MAX_FAILED_PER_HOUR) throw new HttpException({ message: 'Too many attempts, try later', code: 'TOO_MANY_ATTEMPTS' }, 429);

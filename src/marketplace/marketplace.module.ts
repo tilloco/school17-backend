@@ -18,6 +18,7 @@ import { createPaymentProvider, PAYMENT_PROVIDER } from './payments/payment-prov
 import { BlocksService } from './safety/blocks.service';
 import { LegalService } from './legal/legal.service';
 import { BlocksController, ConsentsController, GuardianController, PublicLegalController } from './safety/safety.controller';
+import { PrivacyService } from './privacy/privacy.service';
 import { MessagingService } from './messaging/messaging.service';
 import { MessagingController } from './messaging/messaging.controller';
 import { MessagingGateway } from './messaging/messaging.gateway';
@@ -47,6 +48,7 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
   // Tartib muhim: 'teachers/me' controller'i 'teachers/:id' dan oldin turishi kerak
   controllers: [GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
   providers: [
+    PrivacyService,
     BlocksService, LegalService,
     LedgerService, PaymentsService, { provide: PAYMENT_PROVIDER, useFactory: () => createPaymentProvider() },
     ReviewsService, ReportsService, DiscoveryService, RealtimeService, MessagingGateway, MessagingService, FilesService,

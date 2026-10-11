@@ -253,6 +253,16 @@ export class FilesService {
     return { ok: true };
   }
 
+  /** Akkaunt o'chirilganda: egasining barcha fayllari (saqlash joyidan ham) o'chiriladi. */
+  async purgeOwnerFiles(ownerId: string): Promise<number> {
+    const rows = await this.prisma.storedFile.findMany({ where: { ownerId, deletedAt: null } });
+    for (const f of rows) {
+      await this.storage.deletePrefix(f.storageKey).catch((e) => this.log.warn(e.message));
+      await this.prisma.storedFile.update({ where: { id: f.id }, data: { deletedAt: this.clock.now(), thumbKey: null } });
+    }
+    return rows.length;
+  }
+
   async quota(actor: Actor) {
     return { usedBytes: await this.usedBytes(actor.id), quotaBytes: marketConfig().fileUserQuotaBytes };
   }

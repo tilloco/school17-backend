@@ -1,9 +1,16 @@
-import { Body, Controller, Get, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { Actor } from '../common/actor';
 import { AdminActorGuard, CurrentActor, RequirePermission, UserActorGuard } from '../common/actor.guard';
 import { AccountService } from './account.service';
+import { PrivacyService } from '../privacy/privacy.service';
+import { Equals } from 'class-validator';
+
+class DeleteDto {
+  @Equals('DELETE') confirm!: string;
+}
 
 class UpdateMeDto {
   @IsOptional() @IsString() @MaxLength(100) name?: string;
@@ -19,7 +26,14 @@ class SwitchRoleDto {
 @Controller('me')
 @UseGuards(UserActorGuard)
 export class AccountController {
-  constructor(private account: AccountService) {}
+  constructor(private account: AccountService, private privacy: PrivacyService) {}
+
+  @Post('delete') @HttpCode(200) @RequirePermission('account.delete.self')
+  del(@CurrentActor() actor: Actor, @Body() _dto: DeleteDto) { return this.privacy.deleteAccount(actor); }
+
+  @Throttle({ default: { limit: 3, ttl: 3_600_000 } })
+  @Get('export') @RequirePermission('account.read.self')
+  export(@CurrentActor() actor: Actor) { return this.privacy.exportData(actor); }
 
   @Get()
   @RequirePermission('account.read.self')

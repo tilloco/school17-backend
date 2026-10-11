@@ -159,7 +159,8 @@ export class MessagingService {
     const other = role === 'TEACHER' ? t.studentUserId : t.teacherUserId;
     await this.blocks.assertNotBlocked(t.teacherUserId, t.studentUserId);
     // Voyaga yetmagan o'quvchi bilan: faol vasiy bo'lishi shart va aloqa ma'lumotlari almashilmaydi
-    const pupil = await this.prisma.user.findUnique({ where: { id: t.studentUserId }, select: { dateOfBirth: true } });
+    const pupil = await this.prisma.user.findUnique({ where: { id: t.studentUserId }, select: { dateOfBirth: true, status: true } });
+    if (!pupil || pupil.status !== 'ACTIVE') throw new ConflictException('Recipient unavailable');
     const minor = pupil?.dateOfBirth ? ageInYears(pupil.dateOfBirth, this.clock.now()) < ADULT_AGE : true; // sana noma'lum => ehtiyotkorlik bilan voyaga yetmagan deb hisoblaymiz
     if (minor) {
       if ((await this.guardians.guardianIdsOf(t.studentUserId)).length === 0) throw new ForbiddenException({ message: 'A linked guardian is required for pupils under 18', code: 'GUARDIAN_REQUIRED' });

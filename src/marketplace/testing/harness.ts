@@ -111,7 +111,7 @@ export async function makeUser(
     },
   });
   if (opts.consent !== false) {
-    for (const kind of ['TERMS', 'PRIVACY'] as const) await t.prisma.consent.create({ data: { userId: user.id, kind, version: '2026-10-draft-1' } });
+    for (const kind of (role === Role.GUARDIAN ? ['TERMS', 'PRIVACY', 'GUARDIAN_STATEMENT'] : ['TERMS', 'PRIVACY']) as ('TERMS' | 'PRIVACY' | 'GUARDIAN_STATEMENT')[]) await t.prisma.consent.create({ data: { userId: user.id, kind, version: '2026-10-draft-1' } });
   }
   const token = new JwtService({ secret: TEST_JWT_SECRET }).sign({ sub: user.id, email: user.email }, { expiresIn: '1h' });
   return { id: user.id, email: user.email, role, token };
