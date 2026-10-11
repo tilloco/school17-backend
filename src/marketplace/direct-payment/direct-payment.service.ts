@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Booking, DirectPayment, DirectPaymentStatus, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Actor } from '../common/actor';
@@ -7,6 +7,9 @@ import { ClockService } from '../common/clock';
 import { DomainEvents } from '../common/events';
 import { GuardianService } from '../guardian/guardian.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ADULT_AGE, ageInYears } from '../common/actor';
+import { displayName } from '../booking/booking-rules';
+import { monthRange, toCsv } from './csv';
 import { DirectEvent, nextDirectStatus, PAYABLE_BOOKING_STATUSES } from './direct-payment-rules';
 
 type Side = 'teacher' | 'pupil';
@@ -107,6 +110,109 @@ export class DirectPaymentService implements OnModuleInit {
       this.prisma.directPayment.count({ where: { status: 'PUPIL_MARKED_PAID', booking: mine } }),
     ]);
     return { unpaidLessons: unpaid, awaitingConfirmation: awaiting };
+  }
+
+  // ---------- A4: o'qituvchi pul doskasi ----------
+
+  private pupilName(u: { name: string | null; dateOfBirth: Date | null }): string {
+    const minor = u.dateOfBirth ? ageInYears(u.dateOfBirth, this.clock.now()) < ADULT_AGE : true;
+    return displayName(u.name, minor);
+  }
+
+  /** "Kim menga qarzdor": o'quvchilar bo'yicha guruhlangan to'lanmagan o'tgan darslar. O'quvchi id/email chiqmaydi. */
+  async owed(actor: Actor) {
+    this.requireTeacher(actor);
+    const rows = await this.prisma.directPayment.findMany({
+      where: { status: { in: ['UNPAID', 'NOT_RECEIVED'] }, booking: { teacher: { userId: actor.id }, isTrial: false, status: { in: ['COMPLETED', 'NO_SHOW_STUDENT'] } } },
+      orderBy: { booking: { startAt: 'asc' } },
+      include: { booking: { include: { student: { select: { id: true, name: true, dateOfBirth: true } } } } },
+      take: 1000,
+    });
+    const cutoff = this.clock.now().getTime() - 24 * 3_600_000;
+    const groups = new Map<string, { pupilName: string; totalMinor: number; lessons: { bookingId: string; startAt: Date; amountMinor: number; status: string }[]; lastRemindedAt: Date | null }>();
+    for (const r of rows) {
+      const sid = r.booking.studentId;
+      const g = groups.get(sid) ?? { pupilName: this.pupilName(r.booking.student), totalMinor: 0, lessons: [], lastRemindedAt: null };
+      g.totalMinor += Number(r.amountMinor);
+      g.lessons.push({ bookingId: r.bookingId, startAt: r.booking.startAt, amountMinor: Number(r.amountMinor), status: r.status });
+      if (r.lastRemindedAt && (!g.lastRemindedAt || r.lastRemindedAt > g.lastRemindedAt)) g.lastRemindedAt = r.lastRemindedAt;
+      groups.set(sid, g);
+    }
+    return [...groups.values()].map((g) => ({
+      pupilName: g.pupilName, count: g.lessons.length, totalMinor: g.totalMinor, lessons: g.lessons, lastRemindedAt: g.lastRemindedAt,
+      remindBookingId: g.lessons[0].bookingId, canRemind: !g.lastRemindedAt || g.lastRemindedAt.getTime() < cutoff,
+    }));
+  }
+
+  /** Eslatma: bir o'quvchiga 24 soatda 1 marta. Xabarda karta raqami YO'Q (shablon umumiy, faqat bookingId). */
+  async remind(actor: Actor, bookingId: string) {
+    this.requireTeacher(actor);
+    const b = await this.prisma.booking.findFirst({ where: { id: bookingId, teacher: { userId: actor.id }, isTrial: false } });
+    if (!b) throw new NotFoundException('Not found');
+    const unpaid = await this.prisma.directPayment.findMany({
+      where: { status: { in: ['UNPAID', 'NOT_RECEIVED'] }, booking: { teacher: { userId: actor.id }, studentId: b.studentId, isTrial: false, status: { in: ['COMPLETED', 'NO_SHOW_STUDENT'] } } },
+      orderBy: { booking: { startAt: 'asc' } },
+    });
+    if (unpaid.length === 0) throw new ConflictException({ message: 'Nothing is owed', code: 'NOTHING_OWED' });
+    const now = this.clock.now();
+    const cutoff = new Date(now.getTime() - 24 * 3_600_000);
+    // Poyga holatiga chidamli: eng eski yozuvda "oxirgi eslatma" shartli yangilanadi, 0 bo'lsa limit
+    const anchor = await this.prisma.directPayment.findMany({ where: { booking: { teacher: { userId: actor.id }, studentId: b.studentId } }, select: { lastRemindedAt: true } });
+    if (anchor.some((a) => a.lastRemindedAt && a.lastRemindedAt > cutoff)) throw new HttpException({ message: 'You can remind a pupil once a day', code: 'REMIND_LIMIT' }, 429);
+    const claimed = await this.prisma.directPayment.updateMany({ where: { id: unpaid[0].id, OR: [{ lastRemindedAt: null }, { lastRemindedAt: { lt: cutoff } }] }, data: { lastRemindedAt: now } });
+    if (claimed.count === 0) throw new HttpException({ message: 'You can remind a pupil once a day', code: 'REMIND_LIMIT' }, 429);
+    await this.prisma.directPayment.updateMany({ where: { id: { in: unpaid.map((u) => u.id) } }, data: { lastRemindedAt: now } });
+    for (const u of await this.pupilRecipients(b)) await this.notifications.enqueue(u, 'directpay.reminder', { bookingId: unpaid[0].bookingId }, { dedupeKey: `dp-remind:${unpaid[0].id}:${now.toISOString().slice(0, 10)}:${u}` });
+    await this.audit.log(actor, { action: 'directpay.remind', targetType: 'Booking', targetId: bookingId, metadata: { lessons: unpaid.length } });
+    return { reminded: unpaid.length };
+  }
+
+  /** Oylik daromad: o'qituvchi "oldim" deb tasdiqlagan darslar (oy chegaralari o'qituvchining vaqt zonasida). */
+  async income(actor: Actor, month?: string) {
+    this.requireTeacher(actor);
+    const u = await this.prisma.user.findUniqueOrThrow({ where: { id: actor.id }, select: { timezone: true } });
+    const now = this.clock.now();
+    const key = month ?? `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    const range = monthRange(key, u.timezone);
+    if (!range) throw new BadRequestException('month must be YYYY-MM');
+    const mine = { teacher: { userId: actor.id }, isTrial: false };
+    const [confirmed, awaiting, unpaid] = await Promise.all([
+      this.prisma.directPayment.aggregate({ where: { status: 'TEACHER_CONFIRMED', teacherConfirmedAt: { gte: range.from, lt: range.to }, booking: mine }, _sum: { amountMinor: true }, _count: { _all: true } }),
+      this.prisma.directPayment.count({ where: { status: 'PUPIL_MARKED_PAID', booking: mine } }),
+      this.prisma.directPayment.count({ where: { status: { in: ['UNPAID', 'NOT_RECEIVED'] }, booking: { ...mine, status: { in: ['COMPLETED', 'NO_SHOW_STUDENT'] } } } }),
+    ]);
+    return { month: key, timezone: u.timezone, confirmedMinor: Number(confirmed._sum.amountMinor ?? 0n), confirmedCount: confirmed._count._all, awaitingConfirmation: awaiting, unpaidLessons: unpaid, note: 'Based on marks made by you and your pupils; School17 does not check payments.' };
+  }
+
+  /** O'qituvchining O'Z yozuvlari CSV (formula inyeksiyasidan himoyalangan). */
+  async exportCsv(actor: Actor, from: Date, to: Date) {
+    this.requireTeacher(actor);
+    if (!(from < to) || to.getTime() - from.getTime() > 400 * 86_400_000) throw new BadRequestException('Range must be up to 400 days');
+    const rows = await this.prisma.directPayment.findMany({
+      where: { booking: { teacher: { userId: actor.id }, isTrial: false, startAt: { gte: from, lt: to } } },
+      orderBy: { booking: { startAt: 'asc' } }, take: 5000,
+      include: { booking: { include: { student: { select: { name: true, dateOfBirth: true } } } } },
+    });
+    return toCsv(['date_utc', 'pupil', 'minutes', 'amount_uzs', 'lesson_status', 'payment_mark', 'confirmed_at_utc'],
+      rows.map((r) => [r.booking.startAt.toISOString(), this.pupilName(r.booking.student), r.booking.durationMin, Math.round(Number(r.amountMinor) / 100), r.booking.status, r.status, r.teacherConfirmedAt?.toISOString() ?? '']));
+  }
+
+  /** O'quvchi/vasiy: o'z to'lov belgilari ro'yxati. */
+  async minePupil(actor: Actor) {
+    const linked = actor.role === Role.GUARDIAN ? await this.guardians.linkedStudentIds(actor.id) : [];
+    const rows = await this.prisma.directPayment.findMany({
+      where: { booking: { isTrial: false, OR: [{ studentId: actor.id }, { bookedById: actor.id }, ...(linked.length ? [{ studentId: { in: linked } }] : [])] } },
+      orderBy: { createdAt: 'desc' }, take: 200,
+      include: { booking: { select: { id: true, startAt: true, durationMin: true, status: true, teacher: { select: { id: true, paymentTiming: true, user: { select: { name: true } } } } } } },
+    });
+    return rows.map((r) => ({
+      bookingId: r.bookingId, startAt: r.booking.startAt, durationMin: r.booking.durationMin, lessonStatus: r.booking.status, status: r.status, amountMinor: Number(r.amountMinor),
+      teacher: { id: r.booking.teacher.id, name: r.booking.teacher.user.name }, paymentTiming: r.booking.teacher.paymentTiming,
+    }));
+  }
+
+  private requireTeacher(actor: Actor) {
+    if (actor.role !== Role.TEACHER) throw new ForbiddenException('Forbidden');
   }
 
   // ---------- o'zgartirish ----------

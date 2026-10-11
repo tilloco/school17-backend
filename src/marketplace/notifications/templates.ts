@@ -67,6 +67,11 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     ru: { title: 'Преподаватель предложил другое время', body: 'Преподаватель предложил другое время для урока. Примите или отклоните.' },
     en: { title: 'The teacher suggested another time', body: 'The teacher suggested a different time for your lesson. Accept or decline it.' },
   },
+  'directpay.reminder': {
+    uz: { title: "To'lov haqida eslatma", body: "O'qituvchi o'tgan dars uchun to'lovni eslatdi. Tafsilotlar ilovada." },
+    ru: { title: 'Напоминание об оплате', body: 'Преподаватель напомнил об оплате прошедшего урока. Подробности в приложении.' },
+    en: { title: 'Payment reminder', body: 'Your teacher reminded you about the payment for a past lesson. See the app for details.' },
+  },
   'guardian.linked': {
     uz: { title: 'Vasiy bog\'landi', body: 'Hisobingizga vasiy bog\'landi. U yozishmalaringizni o\'qiy oladi.' },
     ru: { title: 'Опекун привязан', body: 'К вашему аккаунту привязан опекун. Он может читать вашу переписку.' },
