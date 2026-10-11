@@ -82,6 +82,8 @@ model User {
   threadsAsTeacher    ChatThread[]   @relation("ThreadTeacher")
   threadsAsStudent    ChatThread[]   @relation("ThreadStudent")
   chatMessagesSent    ChatMessage[]  @relation("MessageSender")
+  reviewsWritten      Review[]       @relation("ReviewAuthor")
+  reportsMade         Report[]       @relation("ReportReporter")
   dailyStudyMinutes   Int?
   selfLevel           String?
   onboardingCompleted Boolean @default(false)
@@ -578,6 +580,7 @@ model TeacherProfile {
   timeOff      TeacherTimeOff[]
   credentials  TeacherCredential[]
   bookings     Booking[]          @relation("TeacherBookings")
+  reviews      Review[]           @relation("TeacherReviews")
 
   @@index([verificationStatus])
   @@index([priceMinor])
@@ -662,6 +665,7 @@ model Booking {
   actualDurationSec Int?
   outcomeNote      String?
   callRooms        CallRoom[]    @relation("BookingCallRooms")
+  review           Review?       @relation("BookingReview")
   completedAt      DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -801,4 +805,74 @@ model ChatMessage {
 
   @@unique([threadId, seq])
   @@index([senderId, createdAt])
+}
+
+
+// ---------------- Marketplace: sharhlar va shikoyatlar (S7) ----------------
+
+enum ReviewStatus {
+  VISIBLE
+  HIDDEN
+}
+
+model Review {
+  id          String       @id @default(uuid())
+  bookingId   String       @unique
+  booking     Booking      @relation("BookingReview", fields: [bookingId], references: [id], onDelete: Restrict)
+  teacherId   String // TeacherProfile.id
+  teacher     TeacherProfile @relation("TeacherReviews", fields: [teacherId], references: [id], onDelete: Restrict)
+  authorId    String
+  author      User         @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  rating      Int
+  text        String       @default("") @db.Text
+  status      ReviewStatus @default(VISIBLE)
+  hiddenReason String?
+  teacherReply String?     @db.Text
+  repliedAt   DateTime?
+  editedAt    DateTime?
+  createdAt   DateTime     @default(now())
+
+  @@index([teacherId, status, createdAt])
+  @@index([authorId])
+}
+
+enum ReportTargetType {
+  REVIEW
+  USER
+  MESSAGE
+}
+
+enum ReportReason {
+  SPAM
+  ABUSE
+  INAPPROPRIATE
+  FAKE
+  PERSONAL_DATA
+  SAFETY
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  ACTIONED
+  DISMISSED
+}
+
+model Report {
+  id               String           @id @default(uuid())
+  reporterId       String
+  reporter         User             @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType       ReportTargetType
+  targetId         String
+  reason           ReportReason
+  note             String           @default("") @db.Text
+  status           ReportStatus     @default(OPEN)
+  resolutionNote   String?
+  resolvedByAdminId String?
+  resolvedAt       DateTime?
+  createdAt        DateTime         @default(now())
+
+  @@unique([reporterId, targetType, targetId])
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
 }

@@ -34,6 +34,8 @@ export function marketConfig() {
     pendingUploadMaxAgeHours: int('FILE_PENDING_MAX_AGE_HOURS', 24),
     // true bo'lsa va skaner sozlanmagan/xato bersa fayl KARANTINga tushadi (fail closed)
     fileScanRequired: process.env.FILE_SCAN_REQUIRED === 'true',
+    reviewWindowDays: int('REVIEW_WINDOW_DAYS', 30),
+    reviewEditHours: int('REVIEW_EDIT_HOURS', 48),
     // Reyting (Bayes): yangi o'qituvchi o'rtacha bahodan boshlaydi, ko'p baho kamdan-kam bahodan ustun
     ratingPriorMean: Number(process.env.RATING_PRIOR_MEAN) || 4.2,
     ratingPriorWeight: Number(process.env.RATING_PRIOR_WEIGHT) || 5,
