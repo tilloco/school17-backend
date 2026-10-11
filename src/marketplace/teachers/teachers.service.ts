@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { Prisma, Role, VerificationStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Actor } from '../common/actor';
+import { LegalService } from '../legal/legal.service';
 import { AuditService } from '../common/audit.service';
 import { isLanguage, isLevel, isSubject } from '../catalog';
 import { marketConfig } from '../common/config';
@@ -23,7 +24,7 @@ const uniq = (a: string[]) => Array.from(new Set(a));
 
 @Injectable()
 export class TeachersService {
-  constructor(private prisma: PrismaService, private audit: AuditService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService, private legal: LegalService) {}
 
   // ---------- o'qituvchi (egasi) ----------
 
@@ -154,6 +155,7 @@ export class TeachersService {
   }
 
   async submit(actor: Actor) {
+    await this.legal.assertTerms(actor);
     const p = await this.ownProfileOrThrow(actor);
     const [rules, creds] = await Promise.all([
       this.prisma.availabilityRule.count({ where: { teacherId: p.id } }),

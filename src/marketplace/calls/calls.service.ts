@@ -11,6 +11,7 @@ import { marketConfig } from '../common/config';
 import { DomainEvents } from '../common/events';
 import { displayName, isJoinWindowOpen, joinWindow } from '../booking/booking-rules';
 import { BookingService } from '../booking/booking.service';
+import { BlocksService } from '../safety/blocks.service';
 import { PaymentsService } from '../payments/payments.service';
 import { CALL_PROVIDER, CallProvider, ProviderEvent } from './call-provider';
 import { decideOutcome, recordingAllowed, SessionLike } from './presence';
@@ -56,6 +57,7 @@ export class CallsService implements OnModuleInit, OnModuleDestroy {
     private bookings: BookingService,
     private events: DomainEvents,
     private payments: PaymentsService,
+    private blocks: BlocksService,
     @Inject(CALL_PROVIDER) private provider: CallProvider,
   ) {}
 
@@ -137,6 +139,7 @@ export class CallsService implements OnModuleInit, OnModuleDestroy {
       throw new HttpException({ statusCode: 409, message: 'Join not allowed', code: st.reason, opensAt: w.opensAt, closesAt: w.closesAt }, HttpStatus.CONFLICT);
     }
     if (b.student.status !== 'ACTIVE') throw new ConflictException('Participant unavailable');
+    await this.blocks.assertNotBlocked(b.teacher.userId, b.studentId);
     if (marketConfig().paymentRequiredForCalls && !(await this.payments.isPaid(b.id))) {
       throw new HttpException({ statusCode: 402, message: 'Payment required', code: 'PAYMENT_REQUIRED' }, HttpStatus.PAYMENT_REQUIRED);
     }

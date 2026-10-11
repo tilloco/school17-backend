@@ -2,6 +2,7 @@ import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/
 import { Throttle } from '@nestjs/throttler';
 import { Actor } from '../common/actor';
 import { CurrentActor, RequirePermission, UserActorGuard } from '../common/actor.guard';
+import { BlocksService } from '../safety/blocks.service';
 import { DiscoveryService } from './discovery.service';
 
 const list = (v?: string) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 20) : undefined);
@@ -21,15 +22,15 @@ function date(v: string | undefined, name: string): Date | undefined {
 @Controller()
 @UseGuards(UserActorGuard)
 export class DiscoveryController {
-  constructor(private discovery: DiscoveryService) {}
+  constructor(private discovery: DiscoveryService, private blocks: BlocksService) {}
 
   @Get('catalog') @RequirePermission('account.read.self')
   catalog() { return this.discovery.catalog(); }
 
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get('teachers') @RequirePermission('booking.participate')
-  search(@CurrentActor() actor: Actor, @Query() q: Record<string, string>) {
-    return this.discovery.search(this.hiddenFor(actor), {
+  async search(@CurrentActor() actor: Actor, @Query() q: Record<string, string>) {
+    return this.discovery.search(await this.hiddenFor(actor), {
       q: q.q,
       subjects: list(q.subject),
       levels: list(q.level),
@@ -47,7 +48,7 @@ export class DiscoveryController {
   }
 
   /** S9 da bloklangan foydalanuvchilar shu yerdan chiqariladi */
-  private hiddenFor(actor: Actor): string[] {
-    return [actor.id];
+  private async hiddenFor(actor: Actor): Promise<string[]> {
+    return [actor.id, ...(await this.blocks.hiddenUserIds(actor.id))];
   }
 }

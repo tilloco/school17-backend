@@ -6,6 +6,8 @@ import { AuditService } from '../common/audit.service';
 import { ClockService } from '../common/clock';
 import { marketConfig } from '../common/config';
 import { DomainEvents } from '../common/events';
+import { LegalService } from '../legal/legal.service';
+import { BlocksService } from '../safety/blocks.service';
 import { GuardianService } from '../guardian/guardian.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { generateSlots } from '../teachers/availability';
@@ -36,6 +38,8 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
     private guardians: GuardianService,
     private notifications: NotificationsService,
     private events: DomainEvents,
+    private legal: LegalService,
+    private blocks: BlocksService,
   ) {}
 
   onModuleInit() {
@@ -98,8 +102,12 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
       throw new ForbiddenException('Forbidden');
     }
 
+    await this.legal.assertTerms(actor);
     const teacher = await this.verifiedTeacherOrThrow(input.teacherId);
     if (teacher.userId === studentId || teacher.userId === actor.id) throw new BadRequestException('Cannot book yourself');
+    // Blok: bronlovchi, o'quvchi yoki ularning vasiylari o'qituvchini bloklagan (yoki o'qituvchi ularni) bo'lsa — bron yo'q
+    await this.blocks.assertNotBlocked(actor.id, teacher.userId);
+    if (studentId !== actor.id) await this.blocks.assertNotBlocked(studentId, teacher.userId);
 
     await this.expireDue();
     // Oyna aynan darsning o'zi: shu oraliq to'liq mavjud va band emas bo'lsa, slot bor.

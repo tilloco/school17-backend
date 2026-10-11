@@ -6,6 +6,9 @@ import { ClockService } from '../common/clock';
 import { displayName } from '../booking/booking-rules';
 import { FilesService } from '../files/files.service';
 import { GuardianService } from '../guardian/guardian.service';
+import { LegalService } from '../legal/legal.service';
+import { BlocksService } from '../safety/blocks.service';
+import { detectContactInfo } from '../safety/contact-info';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeService } from './realtime.service';
 
@@ -31,6 +34,8 @@ export class MessagingService {
     private files: FilesService,
     private notifications: NotificationsService,
     private realtime: RealtimeService,
+    private legal: LegalService,
+    private blocks: BlocksService,
   ) {}
 
   // ---------- suhbat ----------
@@ -40,6 +45,8 @@ export class MessagingService {
     const b = await this.prisma.booking.findUnique({ where: { id: bookingId }, include: { teacher: { select: { userId: true } } } });
     if (!b || ![b.teacher.userId, b.studentId, b.bookedById].includes(actor.id)) throw new NotFoundException('Not found');
     if (!RELATIONSHIP_STATUSES.includes(b.status)) throw new ConflictException('Booking is not active');
+    await this.legal.assertTerms(actor);
+    await this.blocks.assertNotBlocked(b.teacher.userId, b.studentId);
     const teacherUserId = b.teacher.userId;
     const thread = await this.prisma.chatThread.upsert({
       where: { teacherUserId_studentUserId: { teacherUserId, studentUserId: b.studentId } },
@@ -148,7 +155,17 @@ export class MessagingService {
     const body = (input.body ?? '').trim();
     if (!body && !input.fileId) throw new BadRequestException('Empty message');
     if (body.length > MAX_MESSAGE_LENGTH) throw new BadRequestException('Message too long');
+    await this.legal.assertTerms(actor);
     const other = role === 'TEACHER' ? t.studentUserId : t.teacherUserId;
+    await this.blocks.assertNotBlocked(t.teacherUserId, t.studentUserId);
+    // Voyaga yetmagan o'quvchi bilan: faol vasiy bo'lishi shart va aloqa ma'lumotlari almashilmaydi
+    const pupil = await this.prisma.user.findUnique({ where: { id: t.studentUserId }, select: { dateOfBirth: true } });
+    const minor = pupil?.dateOfBirth ? ageInYears(pupil.dateOfBirth, this.clock.now()) < ADULT_AGE : true; // sana noma'lum => ehtiyotkorlik bilan voyaga yetmagan deb hisoblaymiz
+    if (minor) {
+      if ((await this.guardians.guardianIdsOf(t.studentUserId)).length === 0) throw new ForbiddenException({ message: 'A linked guardian is required for pupils under 18', code: 'GUARDIAN_REQUIRED' });
+      const found = detectContactInfo(body);
+      if (found.found) throw new BadRequestException({ message: "For safety, contact details can't be shared in chats with pupils under 18", code: 'CONTACT_INFO_NOT_ALLOWED', kinds: found.kinds });
+    }
     const otherUser = await this.prisma.user.findUnique({ where: { id: other }, select: { status: true } });
     if (!otherUser || otherUser.status !== 'ACTIVE') throw new ConflictException('Recipient unavailable');
 

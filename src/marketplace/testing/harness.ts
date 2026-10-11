@@ -90,7 +90,7 @@ let counter = 0;
 export async function makeUser(
   t: TestApp,
   role: Role = Role.STUDENT,
-  opts: { dateOfBirth?: string | null; status?: AccountStatus; name?: string; timezone?: string; locale?: string } = {},
+  opts: { consent?: boolean; dateOfBirth?: string | null; status?: AccountStatus; name?: string; timezone?: string; locale?: string } = {},
 ): Promise<TestUser> {
   counter++;
   const id = randomUUID();
@@ -108,6 +108,9 @@ export async function makeUser(
       locale: opts.locale ?? 'uz',
     },
   });
+  if (opts.consent !== false) {
+    for (const kind of ['TERMS', 'PRIVACY'] as const) await t.prisma.consent.create({ data: { userId: user.id, kind, version: '2026-10-draft-1' } });
+  }
   const token = new JwtService({ secret: TEST_JWT_SECRET }).sign({ sub: user.id, email: user.email }, { expiresIn: '1h' });
   return { id: user.id, email: user.email, role, token };
 }
