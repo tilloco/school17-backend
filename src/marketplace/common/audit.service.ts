@@ -11,7 +11,7 @@ export interface AuditEntry {
   metadata?: Record<string, unknown>;
 }
 
-const SENSITIVE_KEYS = /token|secret|password|authorization|key/i;
+const SENSITIVE_KEYS = /token|secret|password|authorization|key|card|cvv|cvc|pan|expiry/i;
 
 /** Metadata ichidagi maxfiy ko'rinishdagi kalitlarni jurnalga yozmaslik uchun tozalaydi. */
 export function scrubMetadata(meta: Record<string, unknown> | undefined): Prisma.InputJsonValue | undefined {

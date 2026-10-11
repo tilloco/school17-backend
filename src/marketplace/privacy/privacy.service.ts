@@ -50,6 +50,7 @@ export class PrivacyService {
         await tx.availabilityRule.deleteMany({ where: { teacherId: tp.id } });
         await tx.teacherTimeOff.deleteMany({ where: { teacherId: tp.id } });
         await tx.teacherCredential.deleteMany({ where: { teacherId: tp.id } });
+        await tx.teacherPaymentInfo.deleteMany({ where: { teacherId: tp.id } });
         await tx.review.updateMany({ where: { teacherId: tp.id }, data: { teacherReply: null } });
         await tx.teacherProfile.update({ where: { id: tp.id }, data: { headline: '', bio: '', subjects: [], levels: [], languages: [], introVideoUrl: null, verificationStatus: 'SUSPENDED', rejectionReason: 'account_deleted' } });
       }

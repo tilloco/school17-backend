@@ -193,6 +193,8 @@ export class TeachersService {
       currency: p.currency,
       introVideoUrl: p.introVideoUrl,
       instantBooking: p.instantBooking,
+      // Karta raqami hech qachon ommaviy javobda yo'q; faqat "mavjud" belgisi (raqam dars qabul qilingandan keyin alohida ochiladi)
+      paymentInfoAvailable: (await this.prisma.teacherPaymentInfo.count({ where: { teacherId: p.id } })) > 0,
       verified: true,
       rating: { count: p.ratingCount, average: p.ratingCount ? p.ratingSum / p.ratingCount : null, bayesian: p.ratingBayes },
       credentials: p.credentials.map((c) => ({ kind: c.kind, title: c.title })),

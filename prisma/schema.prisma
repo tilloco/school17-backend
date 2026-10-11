@@ -586,6 +586,7 @@ model TeacherProfile {
   credentials  TeacherCredential[]
   bookings     Booking[]          @relation("TeacherBookings")
   reviews      Review[]           @relation("TeacherReviews")
+  paymentInfo  TeacherPaymentInfo?
 
   @@index([verificationStatus])
   @@index([priceMinor])
@@ -671,6 +672,7 @@ model Booking {
   outcomeNote      String?
   callRooms        CallRoom[]    @relation("BookingCallRooms")
   review           Review?       @relation("BookingReview")
+  isTrial          Boolean       @default(false)
   payment          LessonPayment? @relation("BookingPayment")
   completedAt      DateTime?
   createdAt        DateTime      @default(now())
@@ -1044,4 +1046,18 @@ model PushToken {
   lastSeenAt DateTime @default(now())
 
   @@index([userId])
+}
+
+
+// ---------------- A2: o'qituvchi karta ma'lumotlari (to'g'ridan-to'g'ri to'lov uchun) ----------------
+// To'liq karta raqami faqat AES-256-GCM bilan shifrlangan holda saqlanadi (APP_DATA_KEY). CVV/muddat/SMS HECH QACHON qabul qilinmaydi.
+model TeacherPaymentInfo {
+  id            String         @id @default(uuid())
+  teacherId     String         @unique
+  teacher       TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  cardNumberEnc String
+  cardLast4     String
+  holderName    String
+  updatedAt     DateTime       @updatedAt
+  createdAt     DateTime       @default(now())
 }
