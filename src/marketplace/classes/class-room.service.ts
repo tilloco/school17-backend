@@ -8,6 +8,7 @@ import { marketConfig } from '../common/config';
 import { CALL_PROVIDER, CallProvider, ProviderEvent, PublishSource } from '../calls/call-provider';
 import { NotificationsService } from '../notifications/notifications.service';
 import { firstName } from './class-rules';
+import { ClassPaymentsService } from './class-payments.service';
 
 export const classRoomName = (sessionId: string) => `class-${sessionId}`;
 const sourcesFor = (s: StageState): PublishSource[] => (s === 'VOICE' ? ['microphone'] : s === 'VOICE_VIDEO' ? ['microphone', 'camera'] : []);
@@ -22,6 +23,7 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
     private clock: ClockService,
     private audit: AuditService,
     private notifications: NotificationsService,
+    private payments: ClassPaymentsService,
     @Inject(CALL_PROVIDER) private provider: CallProvider,
   ) {}
 
@@ -84,6 +86,7 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
     await this.closePresences(s.id, now);
     await this.prisma.classParticipant.updateMany({ where: { sessionId: s.id }, data: { stage: 'NONE', handRaisedAt: null } });
     if (was === 'LIVE') await this.provider.closeRoom(classRoomName(s.id)).catch((e) => this.log.warn(`closeRoom: ${e.message}`));
+    if (teacherNoShow) await this.payments.waiveSession(s.id).catch((e) => this.log.warn(`waive: ${e.message}`));
     if (teacherNoShow) await this.notifyPupils(s.classId, (uid) => this.notifications.enqueue(uid, 'class.teacher_noshow', { classId: s.classId, sessionId: s.id }, { dedupeKey: `noshow:${s.id}` }));
     return fresh;
   }
@@ -137,6 +140,8 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
       const p = await this.prisma.classParticipant.findUnique({ where: { sessionId_pupilId: { sessionId, pupilId: actor.id } } });
       if (p?.removedAt) throw new ForbiddenException({ message: 'You were removed from this session', code: 'REMOVED_FROM_SESSION' });
       if (s.locked) throw new ForbiddenException({ message: 'The room is locked', code: 'ROOM_LOCKED' });
+      const gate = await this.payments.gate(s.classId, actor.id, s);
+      if (gate.required && !gate.ok) throw new ForbiddenException({ message: 'Payment is marked as not done for this period. Pay the teacher directly and ask the teacher to confirm, or ask for a one-time pass.', code: 'PAYMENT_REQUIRED', gate });
       sources = sourcesFor(p?.stage ?? 'NONE');
     }
     const u = await this.prisma.user.findUniqueOrThrow({ where: { id: actor.id }, select: { name: true } });
@@ -160,7 +165,7 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
       presentation: await this.presentation(s),
       whiteboardRev: s.whiteboardRev,
       stageCount, stageMax: cfg.classMaxStagePupils,
-      me: teacher ? null : { handRaised: !!me?.handRaisedAt, stage: me?.stage ?? 'NONE', removed: !!me?.removedAt },
+      me: teacher ? null : { handRaised: !!me?.handRaisedAt, stage: me?.stage ?? 'NONE', removed: !!me?.removedAt, paymentGate: await this.payments.gate(s.classId, actor.id, s) },
     };
   }
 

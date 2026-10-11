@@ -77,6 +77,11 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     ru: { title: 'Преподаватель не пришёл', body: 'Преподаватель не начал занятие. Занятие не состоялось.' },
     en: { title: 'Teacher did not show up', body: 'The teacher did not start the class, so the session did not take place.' },
   },
+  'classpay.reminder': {
+    uz: { title: "To'lov haqida eslatma", body: "O'qituvchi sinf uchun to'lovni eslatdi. Tafsilotlar ilovada." },
+    ru: { title: 'Напоминание об оплате', body: 'Преподаватель напомнил об оплате занятий класса. Подробности в приложении.' },
+    en: { title: 'Payment reminder', body: 'Your teacher reminded you about the class payment. See the app for details.' },
+  },
   'class.cancelled': {
     uz: { title: 'Sinf bekor qilindi', body: "O'qituvchi sinfni bekor qildi. Tafsilotlar ilovada." },
     ru: { title: 'Класс отменён', body: 'Преподаватель отменил класс. Подробности в приложении.' },

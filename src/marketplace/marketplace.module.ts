@@ -32,6 +32,8 @@ import { ClassFilesController, ClassPresentController, ClassFilesAdminController
 import { PDF_RENDERER, createPdfRenderer } from './files/pdf-renderer';
 import { ClassBoardService } from './classes/class-board.service';
 import { ClassBoardController } from './classes/class-board.controller';
+import { ClassPaymentsService } from './classes/class-payments.service';
+import { ClassPaymentsController } from './classes/class-payments.controller';
 import { NetCheckController } from './classes/netcheck.controller';
 import { ClassChatService } from './classes/class-chat.service';
 import { ClassChatController } from './classes/class-chat.controller';
@@ -64,13 +66,14 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     JwtModule.registerAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (c: ConfigService) => ({ secret: c.get<string>('JWT_SECRET') }) }),
   ],
   // Tartib muhim: 'teachers/me' controller'i 'teachers/:id' dan oldin turishi kerak
-  controllers: [ClassBoardController, ClassFilesController, ClassPresentController, ClassFilesAdminController, NetCheckController, ClassesController, ClassRoomController, ClassChatController, DirectPaymentController, TeacherMoneyController, MyDirectPaymentsController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
+  controllers: [ClassPaymentsController, ClassBoardController, ClassFilesController, ClassPresentController, ClassFilesAdminController, NetCheckController, ClassesController, ClassRoomController, ClassChatController, DirectPaymentController, TeacherMoneyController, MyDirectPaymentsController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
   providers: [
     ClassesService,
     ClassRoomService,
     ClassChatService,
     ClassFilesService,
     ClassBoardService,
+    ClassPaymentsService,
     { provide: PDF_RENDERER, useFactory: () => createPdfRenderer() },
     DirectPaymentService,
     PaymentInfoService,

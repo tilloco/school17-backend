@@ -68,7 +68,9 @@ export class PaymentInfoService {
       },
       select: { id: true },
     });
-    if (!eligible) throw new ForbiddenException({ message: 'Card details are shown after the teacher accepts your lesson', code: 'NOT_ELIGIBLE' });
+    // Sinf o'quvchisi: shu o'qituvchining narxli sinfida to'lov qatori bor bo'lsa (bepul sinov seansi uchun qator yaratilmaydi)
+    const classPay = eligible ? null : await this.prisma.classPayment.findFirst({ where: { pupilId: { in: [actor.id, ...linked] }, class: { teacherId: profileId } }, select: { id: true } });
+    if (!eligible && !classPay) throw new ForbiddenException({ message: 'Card details are shown after the teacher accepts your lesson', code: 'NOT_ELIGIBLE' });
     const p = await this.prisma.teacherPaymentInfo.findUnique({ where: { teacherId: profileId } });
     if (!p) throw new NotFoundException({ message: 'The teacher has not added card details', code: 'NO_PAYMENT_INFO' });
     let digits: string;
@@ -77,7 +79,7 @@ export class PaymentInfoService {
     } catch {
       throw new ConflictException({ message: 'Card details cannot be read; ask the teacher to enter them again', code: 'PAYMENT_INFO_UNREADABLE' });
     }
-    await this.audit.log(actor, { action: 'payment_info.reveal', targetType: 'TeacherProfile', targetId: profileId, metadata: { bookingId: eligible.id } });
+    await this.audit.log(actor, { action: 'payment_info.reveal', targetType: 'TeacherProfile', targetId: profileId, metadata: eligible ? { bookingId: eligible.id } : { classPaymentId: classPay!.id } });
     return { cardNumber: formatCard(digits), holderName: p.holderName };
   }
 

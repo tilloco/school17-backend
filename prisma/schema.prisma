@@ -1180,6 +1180,7 @@ model Class {
   cancelledAt       DateTime?
   sessions          ClassSession[]
   enrollments       ClassEnrollment[]
+  payments          ClassPayment[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -1407,4 +1408,31 @@ model ClassFeedPost {
   createdAt DateTime
 
   @@index([classId, createdAt])
+}
+
+// R7: sinf to'lovi belgisi (faqat belgi: ilova pul ushlamaydi). Holat mashinasi DirectPayment bilan bir xil (direct-payment-rules.ts).
+// periodKey: "M:YYYY-MM" (oylik narx) yoki "S:<sessionId>" (har dars uchun). Bron yo'li (DirectPayment) o'zgarmagan.
+model ClassPayment {
+  id                 String               @id @default(uuid())
+  classId            String
+  class              Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+  pupilId            String
+  periodKey          String
+  sessionId          String?
+  amountMinor        BigInt
+  status             DirectPaymentStatus  @default(UNPAID)
+  pupilMarkedAt      DateTime?
+  teacherConfirmedAt DateTime?
+  notReceivedAt      DateTime?
+  waivedAt           DateTime?
+  waivedFrom         DirectPaymentStatus?
+  waivedReason       String?
+  lastRemindedAt     DateTime?
+  joinOverrideSessionId String? // o'qituvchi shu sessiya uchun ruxsat bergan
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@unique([classId, pupilId, periodKey])
+  @@index([classId, periodKey, status])
+  @@index([pupilId, status])
 }
