@@ -18,6 +18,7 @@ export interface ProfileInput {
   priceMinor?: number;
   introVideoUrl?: string | null;
   instantBooking?: boolean;
+  paymentTiming?: 'PAY_BEFORE' | 'PAY_AFTER';
 }
 
 const uniq = (a: string[]) => Array.from(new Set(a));
@@ -70,6 +71,7 @@ export class TeachersService {
       data.introVideoUrl = input.introVideoUrl;
     }
     if (input.instantBooking !== undefined) data.instantBooking = input.instantBooking;
+    if (input.paymentTiming !== undefined) data.paymentTiming = input.paymentTiming;
 
     const existing = await this.prisma.teacherProfile.findUnique({ where: { userId: actor.id } });
     const profile = existing
@@ -193,6 +195,7 @@ export class TeachersService {
       currency: p.currency,
       introVideoUrl: p.introVideoUrl,
       instantBooking: p.instantBooking,
+      paymentTiming: p.paymentTiming,
       // Karta raqami hech qachon ommaviy javobda yo'q; faqat "mavjud" belgisi (raqam dars qabul qilingandan keyin alohida ochiladi)
       paymentInfoAvailable: (await this.prisma.teacherPaymentInfo.count({ where: { teacherId: p.id } })) > 0,
       verified: true,
@@ -281,6 +284,7 @@ export class TeachersService {
       currency: p.currency,
       introVideoUrl: p.introVideoUrl,
       instantBooking: p.instantBooking,
+      paymentTiming: p.paymentTiming,
       verificationStatus: p.verificationStatus,
       verifiedAt: p.verifiedAt,
       rejectionReason: p.rejectionReason,

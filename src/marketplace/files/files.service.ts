@@ -23,7 +23,7 @@ const ALLOWED_DECLARED_MIME: Record<string, DetectedType> = {
   'application/pdf': 'pdf',
 };
 
-const PURPOSES_FOR_USERS: StoredFilePurpose[] = ['CREDENTIAL', 'MESSAGE_ATTACHMENT', 'AVATAR'];
+const PURPOSES_FOR_USERS: StoredFilePurpose[] = ['CREDENTIAL', 'MESSAGE_ATTACHMENT', 'AVATAR', 'PAYMENT_PROOF'];
 
 const newKey = () => `f_${randomBytes(16).toString('hex')}`;
 
@@ -55,8 +55,8 @@ export class FilesService {
     if (input.purpose === 'CREDENTIAL' && actor.role !== 'TEACHER') throw new ForbiddenException('Forbidden');
     const type = ALLOWED_DECLARED_MIME[input.mime];
     if (!type) throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
-    if (input.purpose === 'AVATAR' && type === 'pdf') throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
-    const limit = type === 'pdf' ? cfg.fileMaxPdfBytes : cfg.fileMaxImageBytes;
+    if ((input.purpose === 'AVATAR' || input.purpose === 'PAYMENT_PROOF') && type === 'pdf') throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
+    const limit = input.purpose === 'PAYMENT_PROOF' ? cfg.fileMaxProofBytes : type === 'pdf' ? cfg.fileMaxPdfBytes : cfg.fileMaxImageBytes;
     if (!Number.isInteger(input.size) || input.size <= 0) throw new BadRequestException('Bad size');
     if (input.size > limit) throw new PayloadTooLargeException({ message: 'File too large', code: 'FILE_TOO_LARGE', limitBytes: limit });
 
@@ -206,12 +206,20 @@ export class FilesService {
       if (m.thread.teacherUserId === actor.id || m.thread.studentUserId === actor.id) return true;
       if (actor.role === 'GUARDIAN' && (await this.guardians.isActiveGuardianOf(actor.id, m.thread.studentUserId))) return true;
     }
+    if (file.purpose === 'PAYMENT_PROOF') {
+      // Kvitansiya: faqat to'lov egasi (yuklagan), o'qituvchi, o'quvchi/bronlovchi va o'quvchining vasiysi ko'radi (admin - alohida audit qilinadigan yo'l)
+      const dp = await this.prisma.directPayment.findFirst({ where: { proofFileId: file.id }, include: { booking: { include: { teacher: { select: { userId: true } } } } } });
+      if (!dp) return false;
+      const b = dp.booking;
+      if ([b.teacher.userId, b.studentId, b.bookedById].includes(actor.id)) return true;
+      if (actor.role === 'GUARDIAN' && (await this.guardians.isActiveGuardianOf(actor.id, b.studentId))) return true;
+    }
     return false;
   }
 
   async downloadUrl(actor: Actor, fileId: string, variant: 'original' | 'thumb', adminOverride = false) {
     const file = await this.prisma.storedFile.findUnique({ where: { id: fileId } });
-    const allowed = file && (adminOverride ? !file.deletedAt && file.status === 'READY' && file.purpose === 'CREDENTIAL' : await this.canRead(actor, file));
+    const allowed = file && (adminOverride ? !file.deletedAt && file.status === 'READY' && (file.purpose === 'CREDENTIAL' || file.purpose === 'PAYMENT_PROOF') : await this.canRead(actor, file));
     if (!file || !allowed) throw new NotFoundException('Not found');
     if (variant === 'thumb' && !file.thumbKey) throw new NotFoundException('No thumbnail');
     const exp = Math.floor(this.clock.now().getTime() / 1000) + marketConfig().downloadUrlTtlSeconds;

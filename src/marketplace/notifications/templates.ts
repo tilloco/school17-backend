@@ -42,6 +42,26 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     ru: { title: 'Предложен перенос', body: 'Предложено перенести урок на другое время. Ответьте.' },
     en: { title: 'Reschedule proposed', body: 'A new time was proposed for your lesson. Please respond.' },
   },
+  'directpay.marked': {
+    uz: { title: "O'quvchi to'lov qildi deb belgiladi", body: "Dars uchun to'lov belgilandi. Pul tushganini tekshirib, tasdiqlang." },
+    ru: { title: 'Ученик отметил оплату', body: 'Оплата за урок отмечена. Проверьте поступление и подтвердите.' },
+    en: { title: 'Pupil marked the lesson as paid', body: 'A payment was marked for a lesson. Check your card and confirm.' },
+  },
+  'directpay.confirmed': {
+    uz: { title: "O'qituvchi to'lovni tasdiqladi", body: "O'qituvchi to'lov kelganini tasdiqladi." },
+    ru: { title: 'Преподаватель подтвердил оплату', body: 'Преподаватель подтвердил, что оплата получена.' },
+    en: { title: 'Teacher confirmed the payment', body: 'The teacher confirmed they received the payment.' },
+  },
+  'directpay.not_received': {
+    uz: { title: "To'lov kelmadi deb belgilandi", body: "O'qituvchi to'lov kelmaganini belgiladi. Tekshirib, kerak bo'lsa qayta belgilang." },
+    ru: { title: 'Оплата не получена', body: 'Преподаватель отметил, что оплата не поступила. Проверьте и при необходимости отметьте снова.' },
+    en: { title: 'Payment not received', body: 'The teacher marked the payment as not received. Please check and mark it again if needed.' },
+  },
+  'directpay.waived': {
+    uz: { title: "Bu dars bepul", body: "Bu dars uchun to'lov talab qilinmaydi." },
+    ru: { title: 'Этот урок бесплатный', body: 'За этот урок платить не нужно.' },
+    en: { title: 'This lesson is free', body: 'No payment is needed for this lesson.' },
+  },
   'guardian.linked': {
     uz: { title: 'Vasiy bog\'landi', body: 'Hisobingizga vasiy bog\'landi. U yozishmalaringizni o\'qiy oladi.' },
     ru: { title: 'Опекун привязан', body: 'К вашему аккаунту привязан опекун. Он может читать вашу переписку.' },

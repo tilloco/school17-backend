@@ -508,6 +508,7 @@ enum CredentialStatus {
 }
 
 enum StoredFilePurpose {
+  PAYMENT_PROOF
   CREDENTIAL
   MESSAGE_ATTACHMENT
   AVATAR
@@ -553,6 +554,7 @@ model StoredFile {
   createdAt    DateTime          @default(now())
   credentials  TeacherCredential[]
   messages     ChatMessage[]
+  directPaymentProofs DirectPayment[] @relation("DirectPaymentProof")
 
   @@index([ownerId, createdAt])
 }
@@ -570,6 +572,7 @@ model TeacherProfile {
   currency           String             @default("UZS")
   introVideoUrl      String?
   instantBooking     Boolean            @default(false)
+  paymentTiming      PaymentTiming      @default(PAY_AFTER)
   verificationStatus VerificationStatus @default(DRAFT)
   verifiedAt         DateTime?
   verifiedByAdminId  String?
@@ -673,6 +676,7 @@ model Booking {
   callRooms        CallRoom[]    @relation("BookingCallRooms")
   review           Review?       @relation("BookingReview")
   isTrial          Boolean       @default(false)
+  directPayment    DirectPayment? @relation("BookingDirectPayment")
   payment          LessonPayment? @relation("BookingPayment")
   completedAt      DateTime?
   createdAt        DateTime      @default(now())
@@ -853,6 +857,7 @@ enum ReportTargetType {
 }
 
 enum ReportReason {
+  PAYMENT_PROBLEM
   SPAM
   ABUSE
   INAPPROPRIATE
@@ -1060,4 +1065,41 @@ model TeacherPaymentInfo {
   holderName    String
   updatedAt     DateTime       @updatedAt
   createdAt     DateTime       @default(now())
+}
+
+
+// ---------------- A3: to'g'ridan-to'g'ri to'lovni kuzatish (platforma pul ushlamaydi) ----------------
+enum PaymentTiming {
+  PAY_BEFORE
+  PAY_AFTER
+}
+
+enum DirectPaymentStatus {
+  UNPAID
+  PUPIL_MARKED_PAID
+  TEACHER_CONFIRMED
+  NOT_RECEIVED
+  WAIVED
+}
+
+// Faqat belgi: "o'quvchi to'lagan deb belgiladi" / "o'qituvchi oldim deb tasdiqladi". Ilova to'lovni tekshirmaydi, ushlamaydi, qaytarmaydi.
+model DirectPayment {
+  id                 String              @id @default(uuid())
+  bookingId          String              @unique
+  booking            Booking             @relation("BookingDirectPayment", fields: [bookingId], references: [id], onDelete: Restrict)
+  amountMinor        BigInt // dars narxi (qabul qilingan paytdagi nusxa)
+  status             DirectPaymentStatus @default(UNPAID)
+  pupilMarkedAt      DateTime?
+  teacherConfirmedAt DateTime?
+  notReceivedAt      DateTime?
+  waivedAt           DateTime?
+  waivedFrom         DirectPaymentStatus?
+  waivedReason       String?
+  proofFileId        String?
+  proofFile          StoredFile?         @relation("DirectPaymentProof", fields: [proofFileId], references: [id], onDelete: SetNull)
+  lastRemindedAt     DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([status, createdAt])
 }

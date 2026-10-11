@@ -18,12 +18,12 @@ import {
 export type BookingSide = 'student' | 'booker' | 'teacher';
 
 type BookingWithParties = Booking & {
-  teacher: { id: string; userId: string; user: { name: string | null } };
+  teacher: { id: string; userId: string; paymentTiming: string; user: { name: string | null } };
   student: { id: string; name: string | null; dateOfBirth: Date | null };
 };
 
 const PARTIES = {
-  teacher: { select: { id: true, userId: true, user: { select: { name: true } } } },
+  teacher: { select: { id: true, userId: true, paymentTiming: true, user: { select: { name: true } } } },
   student: { select: { id: true, name: true, dateOfBirth: true } },
 } as const;
 
@@ -385,6 +385,7 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
 
   private async onConfirmed(b: Booking, teacherUserId: string) {
     await this.scheduleReminders(b, teacherUserId);
+    await this.events.emit('booking.confirmed', { bookingId: b.id });
     for (const u of new Set([b.bookedById, b.studentId, teacherUserId])) {
       await this.notifications.enqueue(u, 'booking.confirmed', { bookingId: b.id, startAt: b.startAt.toISOString() });
     }
@@ -419,7 +420,8 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
       durationMin: b.durationMin,
       priceMinor: b.priceMinor,
       currency: b.currency,
-      teacher: { id: b.teacher.id, name: b.teacher.user.name },
+      teacher: { id: b.teacher.id, name: b.teacher.user.name, paymentTiming: b.teacher.paymentTiming },
+      isTrial: b.isTrial,
       // O'qituvchiga o'quvchining faqat ko'rinadigan ismi beriladi (voyaga yetmaganlar uchun qisqartirilgan); email/id berilmaydi
       student: side === 'teacher' ? { name: displayName(b.student.name, studentIsMinor) } : { id: b.student.id, name: b.student.name },
       joinWindow: { opensAt: w.opensAt, closesAt: w.closesAt },

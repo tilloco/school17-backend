@@ -26,6 +26,7 @@ export function marketConfig() {
     presenceStaleSeconds: int('CALL_PRESENCE_STALE_SECONDS', 45),
     // Fayllar
     fileMaxImageBytes: int('FILE_MAX_IMAGE_BYTES', 10 * 1024 * 1024),
+    fileMaxProofBytes: int('FILE_MAX_PROOF_BYTES', 5 * 1024 * 1024),
     fileMaxPdfBytes: int('FILE_MAX_PDF_BYTES', 50 * 1024 * 1024),
     fileUserQuotaBytes: int('FILE_USER_QUOTA_BYTES', 500 * 1024 * 1024),
     fileChunkBytes: 1024 * 1024,

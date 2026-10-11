@@ -23,6 +23,8 @@ import { NotificationDispatcher, PUSH_SENDER, createPushSender } from './notific
 import { NotificationsController } from './notifications/notifications.controller';
 import { PaymentInfoService } from './teachers/payment-info.service';
 import { PaymentInfoMeController, PaymentInfoRevealController } from './teachers/payment-info.controller';
+import { DirectPaymentService } from './direct-payment/direct-payment.service';
+import { DirectPaymentController } from './direct-payment/direct-payment.controller';
 import { MessagingService } from './messaging/messaging.service';
 import { MessagingController } from './messaging/messaging.controller';
 import { MessagingGateway } from './messaging/messaging.gateway';
@@ -50,8 +52,9 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     JwtModule.registerAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (c: ConfigService) => ({ secret: c.get<string>('JWT_SECRET') }) }),
   ],
   // Tartib muhim: 'teachers/me' controller'i 'teachers/:id' dan oldin turishi kerak
-  controllers: [PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
+  controllers: [DirectPaymentController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
   providers: [
+    DirectPaymentService,
     PaymentInfoService,
     NotificationDispatcher, { provide: PUSH_SENDER, useFactory: () => createPushSender() },
     PrivacyService,
@@ -61,6 +64,6 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     { provide: OBJECT_STORAGE, useFactory: () => new LocalDiskStorage(process.env.FILES_DIR || join(process.cwd(), 'uploads-private')) },
     { provide: SCAN_PROVIDER, useFactory: () => createScanProvider() },
     DomainEvents, { provide: CALL_PROVIDER, useFactory: () => createCallProvider() }, CallsService, ClockService, GuardianService, NotificationsService, BookingService, AuditService, AccountService, TeachersService, UserActorGuard, AdminActorGuard],
-  exports: [PaymentInfoService, NotificationDispatcher, PUSH_SENDER, BlocksService, LegalService, LedgerService, PaymentsService, PAYMENT_PROVIDER, ReviewsService, ReportsService, FilesService, MessagingService, RealtimeService, DomainEvents, CALL_PROVIDER, CallsService, ClockService, GuardianService, NotificationsService, BookingService, AuditService, AccountService, TeachersService],
+  exports: [DirectPaymentService, PaymentInfoService, NotificationDispatcher, PUSH_SENDER, BlocksService, LegalService, LedgerService, PaymentsService, PAYMENT_PROVIDER, ReviewsService, ReportsService, FilesService, MessagingService, RealtimeService, DomainEvents, CALL_PROVIDER, CallsService, ClockService, GuardianService, NotificationsService, BookingService, AuditService, AccountService, TeachersService],
 })
 export class MarketplaceModule {}

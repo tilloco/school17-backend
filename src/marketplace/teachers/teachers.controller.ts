@@ -17,6 +17,7 @@ class ProfileDto {
   @IsOptional() @IsInt() priceMinor?: number;
   @ValidateIf((_o, v) => v !== undefined) @IsOptional() @IsString() @MaxLength(300) introVideoUrl?: string | null;
   @IsOptional() @IsBoolean() instantBooking?: boolean;
+  @IsOptional() @IsIn(['PAY_BEFORE', 'PAY_AFTER']) paymentTiming?: 'PAY_BEFORE' | 'PAY_AFTER';
 }
 
 class RuleDto {

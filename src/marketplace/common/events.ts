@@ -6,6 +6,7 @@ export interface DomainEventMap {
   'booking.completed': { bookingId: string; billableSeconds: number };
   'booking.noshow': { bookingId: string; kind: 'NO_SHOW_STUDENT' | 'NO_SHOW_TEACHER' };
   'booking.failed': { bookingId: string; note: string };
+  'booking.confirmed': { bookingId: string };
   'booking.declined': { bookingId: string };
   'booking.expired': { bookingId: string };
 }
