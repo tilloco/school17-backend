@@ -1,11 +1,11 @@
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert/strict';
+import { marketConfig } from '../common/config';
 import { cancellationOutcome, displayName, isJoinWindowOpen, joinWindow, nextBookingStatus, priceForDuration, startTimeProblem } from './booking-rules';
 
 const cfg = {
-  minPriceMinor: 0, maxPriceMinor: 0, lessonDurationsMin: [60], minNoticeMinutes: 60, maxAdvanceDays: 60, requestExpiryHours: 24,
-  freeCancelHours: 12, lateCancelRefundBps: 0, joinOpensMinutesBefore: 5, joinClosesMinutesAfterEnd: 5, callTokenTtlSeconds: 600,
-  noShowGraceMinutes: 10, commissionBps: 1500,
+  ...marketConfig(), minNoticeMinutes: 60, maxAdvanceDays: 60, freeCancelHours: 12, lateCancelRefundBps: 0,
+  joinOpensMinutesBefore: 5, joinClosesMinutesAfterEnd: 5, noShowGraceMinutes: 10,
 };
 
 describe('booking rules (pure)', () => {

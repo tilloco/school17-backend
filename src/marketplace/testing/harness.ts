@@ -11,6 +11,7 @@ import { AccountStatus, PrismaClient, Role } from '@prisma/client';
 import { JwtStrategy } from '../../auth/jwt.strategy';
 import { AdminJwtStrategy } from '../../admin-auth/admin-jwt.strategy';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { configureRawWebhook } from '../common/http';
 import { MarketplaceModule } from '../marketplace.module';
 
 export const TEST_JWT_SECRET = 'test-user-secret-not-real';
@@ -59,6 +60,7 @@ export async function createTestApp(extraModules: any[] = []): Promise<TestApp> 
   class TestAppModule {}
 
   const app = await NestFactory.create(TestAppModule, { logger: false });
+  configureRawWebhook(app);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   await app.listen(0, '127.0.0.1');
   const baseUrl = (await app.getUrl()).replace('[::1]', '127.0.0.1');

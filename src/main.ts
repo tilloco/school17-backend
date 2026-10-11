@@ -5,6 +5,7 @@ import { mkdirSync } from 'fs';
 import { join } from 'path';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { configureRawWebhook } from './marketplace/common/http';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -45,6 +46,7 @@ async function bootstrap() {
 
   // Standart xavfsizlik HTTP headerlari (XSS, clickjacking va h.k. dan qisman himoya)
   app.use(helmet());
+  configureRawWebhook(app);
 
   // Kelayotgan JSON'larni avtomatik tekshirish va noto'g'ri ma'lumotni rad etish.
   // whitelist+forbidNonWhitelisted: DTO'da dekoratorsiz maydon bo'lsa so'rov rad

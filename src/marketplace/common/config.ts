@@ -21,6 +21,9 @@ export function marketConfig() {
     joinClosesMinutesAfterEnd: int('CALL_JOIN_CLOSES_MINUTES_AFTER_END', 5),
     callTokenTtlSeconds: int('CALL_TOKEN_TTL_SECONDS', 600),
     noShowGraceMinutes: int('CALL_NOSHOW_GRACE_MINUTES', 10),
+    minLessonSeconds: int('CALL_MIN_LESSON_SECONDS', 300), // shundan kam birga bo'lish = dars o'tmagan
+    presentMinSeconds: int('CALL_PRESENT_MIN_SECONDS', 60), // shuncha turgan tomon "keldi" hisoblanadi
+    presenceStaleSeconds: int('CALL_PRESENCE_STALE_SECONDS', 45),
     // Komissiya (bazis punkt: 1500 = 15%)
     commissionBps: int('PLATFORM_COMMISSION_BPS', 1500),
   };

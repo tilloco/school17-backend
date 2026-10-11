@@ -5,6 +5,7 @@ import { Actor, ADULT_AGE, ageInYears } from '../common/actor';
 import { AuditService } from '../common/audit.service';
 import { ClockService } from '../common/clock';
 import { marketConfig } from '../common/config';
+import { DomainEvents } from '../common/events';
 import { GuardianService } from '../guardian/guardian.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { generateSlots } from '../teachers/availability';
@@ -34,6 +35,7 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
     private clock: ClockService,
     private guardians: GuardianService,
     private notifications: NotificationsService,
+    private events: DomainEvents,
   ) {}
 
   onModuleInit() {
@@ -179,6 +181,7 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
       },
     });
     await this.notifications.cancelPendingForBooking(id);
+    await this.events.emit('booking.cancelled', { bookingId: id });
     await this.audit.log(actor, { action: 'booking.cancel', targetType: 'Booking', targetId: id, metadata: { late: outcome.late, refundBps: outcome.refundBps } });
     const others = [b.teacher.userId, b.bookedById, b.studentId].filter((u) => u !== actor.id);
     for (const u of new Set(others)) await this.notifications.enqueue(u, 'booking.cancelled', { bookingId: id });
@@ -226,6 +229,7 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
       throw e;
     }
     await this.notifications.cancelPendingForBooking(id);
+    await this.events.emit('booking.rescheduled', { bookingId: id });
     await this.scheduleReminders({ ...b, startAt: b.proposedStartAt, endAt: newEnd } as Booking, b.teacher.userId);
     await this.audit.log(actor, { action: 'booking.reschedule', targetType: 'Booking', targetId: id });
     return this.get(actor, id);
@@ -241,6 +245,9 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
     const next = this.transitionOrThrow(b, event);
     const now = this.clock.now();
     if (now < earliestNoShowAt(b.startAt)) throw new ConflictException('Too early to report a no-show');
+    // Xabar beruvchi o'zi darsga kelgan bo'lishi shart (kelmagan o'qituvchi "o'quvchi kelmadi" deya olmaydi)
+    const reporterJoined = await this.prisma.callSession.count({ where: { bookingId: id, userId: actor.id } });
+    if (!reporterJoined) throw new ConflictException('You must join the call before reporting a no-show');
     await this.prisma.booking.update({ where: { id }, data: { status: next, noShowMarkedAt: now } });
     await this.audit.log(actor, { action: 'booking.no_show', targetType: 'Booking', targetId: id, metadata: { reportedBy: side, status: next } });
     return this.get(actor, id);

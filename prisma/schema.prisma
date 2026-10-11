@@ -639,6 +639,8 @@ model Booking {
   proposedById     String?
   noShowMarkedAt   DateTime?
   actualDurationSec Int?
+  outcomeNote      String?
+  callRooms        CallRoom[]    @relation("BookingCallRooms")
   completedAt      DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -670,4 +672,73 @@ model Notification {
   @@unique([userId, dedupeKey])
   @@index([userId, createdAt])
   @@index([sentAt, dueAt])
+}
+
+// ---------------- Marketplace: video qo'ng'iroq (S4) ----------------
+
+enum CallRoomStatus {
+  ACTIVE
+  ENDED
+  REVOKED
+}
+
+model CallRoom {
+  id         String         @id @default(uuid())
+  bookingId  String
+  booking    Booking        @relation("BookingCallRooms", fields: [bookingId], references: [id], onDelete: Cascade)
+  roomName   String         @unique // taxmin qilib bo'lmaydigan (128 bit tasodifiy)
+  provider   String
+  status     CallRoomStatus @default(ACTIVE)
+  teacherKey String // provayderdagi anonim identity (haqiqiy user id oshkor qilinmaydi)
+  studentKey String
+  recordingConsentTeacher Boolean?
+  recordingConsentStudent Boolean?
+  createdAt  DateTime       @default(now())
+  endedAt    DateTime?
+  revokedAt  DateTime?
+
+  sessions CallSession[]
+  tokens   CallTokenIssue[]
+
+  @@index([bookingId, status])
+}
+
+model CallSession {
+  id         String    @id @default(uuid())
+  roomId     String
+  room       CallRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  bookingId  String
+  userId     String
+  side       String // TEACHER | STUDENT
+  source     String // CLIENT | PROVIDER
+  joinedAt   DateTime
+  lastSeenAt DateTime
+  leftAt     DateTime?
+  endReason  String?
+
+  @@index([bookingId, side])
+  @@index([bookingId, userId])
+}
+
+model CallTokenIssue {
+  id        String    @id @default(uuid())
+  roomId    String
+  room      CallRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  issuedAt  DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  @@index([roomId, userId])
+}
+
+model CallEvent {
+  id        String   @id @default(uuid())
+  bookingId String
+  userId    String?
+  type      String
+  data      Json?
+  at        DateTime @default(now())
+
+  @@index([bookingId, at])
 }

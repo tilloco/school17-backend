@@ -259,6 +259,10 @@ describe('bookings (integration)', () => {
     clock.set(new Date('2026-11-03T05:05:00Z'));
     assert.equal((await api(t, tu.token).post('/bookings/' + b.id + '/no-show')).status, 409, 'grace period not over');
     clock.set(new Date('2026-11-03T05:12:00Z'));
+    // o'qituvchi dars xonasiga kirmagan bo'lsa, "o'quvchi kelmadi" deb xabar bera olmaydi
+    assert.equal((await api(t, tu.token).post('/bookings/' + b.id + '/no-show')).status, 409);
+    const room = await t.prisma.callRoom.create({ data: { bookingId: b.id, roomName: 'r_test_' + b.id, provider: 'mock', teacherKey: 'p_t' + b.id, studentKey: 'p_s' + b.id } });
+    await t.prisma.callSession.create({ data: { roomId: room.id, bookingId: b.id, userId: tu.id, side: 'TEACHER', source: 'CLIENT', joinedAt: new Date('2026-11-03T04:58:00Z'), lastSeenAt: new Date('2026-11-03T05:12:00Z') } });
     const r = await api(t, tu.token).post('/bookings/' + b.id + '/no-show');
     assert.equal(r.body.status, 'NO_SHOW_STUDENT');
     assert.equal((await api(t, s.token).post('/bookings/' + b.id + '/no-show')).status, 409, 'already resolved');
