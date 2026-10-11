@@ -85,7 +85,7 @@ export class TeachersMeController {
 export class TeachersPublicController {
   constructor(private teachers: TeachersService) {}
 
-  @Get(':id')
+  @Get(':id') @RequirePermission('booking.participate')
   get(@Param('id', ParseUUIDPipe) id: string) { return this.teachers.publicProfile(id); }
 }
 

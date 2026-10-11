@@ -1,11 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
-import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { configureRawWebhook } from './marketplace/common/http';
+import { configureHttpSecurity } from './marketplace/common/http';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -44,35 +43,9 @@ async function bootstrap() {
   const trustProxyHops = Number(process.env.TRUST_PROXY ?? 1);
   app.getHttpAdapter().getInstance().set('trust proxy', trustProxyHops);
 
-  // Standart xavfsizlik HTTP headerlari (XSS, clickjacking va h.k. dan qisman himoya)
-  app.use(helmet());
-  configureRawWebhook(app);
-
-  // Kelayotgan JSON'larni avtomatik tekshirish va noto'g'ri ma'lumotni rad etish.
-  // whitelist+forbidNonWhitelisted: DTO'da dekoratorsiz maydon bo'lsa so'rov rad
-  // etiladi - shuning uchun HAR BIR DTO maydonida class-validator dekoratori bo'lishi
-  // SHART (masalan ClickWebhookDto - Click webhook'ini qabul qilish uchun).
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-  // CORS: faqat .env'da ruxsat berilgan originlar (mobil ilova + admin panel).
-  // XAVFSIZLIK: production'da ALLOWED_ORIGINS bo'sh bo'lsa endi server ishga
-  // tushmaydi (yuqoridagi tekshiruv) - shuning uchun bu yerda "aks holda hammaga
-  // ochiq" holati faqat local development uchun qoladi, productionga sizib chiqmaydi.
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
-
-  app.enableCors({
-    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
-    credentials: true,
-  });
+  // helmet, xom body yo'llari, qat'iy validatsiya (whitelist+forbidNonWhitelisted: HAR BIR DTO maydonida
+  // class-validator dekoratori SHART) va CORS (ALLOWED_ORIGINS) - marketplace/common/http.ts da, testlar bilan umumiy.
+  configureHttpSecurity(app);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

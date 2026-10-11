@@ -100,7 +100,8 @@ window.__state = () => ({ pcs: pc ? [pc.connectionState, pc.iceConnectionState, 
 export class SmokeController {
   constructor(@Inject(CALL_PROVIDER) private provider: MockCallProvider, private clock: ClockService) {}
 
-  @Get('page') @Header('content-type', 'text/html; charset=utf-8')
+  // Test sahifasi inline skript ishlatadi: helmet CSP'sini FAQAT shu test sahifasi uchun yumshatamiz
+  @Get('page') @Header('content-type', 'text/html; charset=utf-8') @Header('content-security-policy', "default-src 'self' 'unsafe-inline' blob: data:; connect-src 'self'; media-src * blob:")
   page() {
     return PAGE(machineJs());
   }
