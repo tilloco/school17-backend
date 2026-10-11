@@ -28,6 +28,12 @@ export function marketConfig() {
     classMaxPupils: int('CLASS_MAX_PUPILS', 30), // bir sinfdagi o'quvchilar soni chegarasi (o'qituvchi capacity'ni 1..shu oraliqda tanlaydi)
     classMaxStagePupils: int('CLASS_MAX_STAGE_PUPILS', 10), // bir vaqtda sahnadagi o'quvchilar (R2)
     classJoinAttemptsPerHour: int('CLASS_JOIN_ATTEMPTS_PER_HOUR', 10), // kod/havola bilan qo'shilish urinishlari, bir foydalanuvchiga
+    classLobbyMinutes: int('CLASS_LOBBY_MINUTES', 10), // kutish xonasi darsdan necha daqiqa oldin ochiladi
+    classTokenTtlSeconds: int('CLASS_TOKEN_TTL_SECONDS', 900), // xona tokenining umri; sessiya ochiq ekan qayta olinadi
+    classTeacherNoShowMinutes: int('CLASS_TEACHER_NOSHOW_MINUTES', 15), // o'qituvchi boshlamasa, shundan keyin sessiya "kelmadi" bilan yopiladi
+    classTeacherDropSeconds: int('CLASS_TEACHER_DROP_SECONDS', 300), // o'qituvchi uzilib qolsa xona shuncha vaqt ochiq turadi
+    classLateJoinMinutes: int('CLASS_LATE_JOIN_MINUTES', 5), // boshlanishdan keyin shuncha daqiqadan kech kirish "kechikdi" hisoblanadi
+    classOverrunMinutes: int('CLASS_OVERRUN_MINUTES', 30), // tugash vaqtidan keyin shuncha o'tsa, sessiya o'zi yopiladi
     classHorizonWeeks: int('CLASS_SESSION_HORIZON_WEEKS', 4), // seanslar necha hafta oldindan yaratiladi
     // Fayllar
     fileMaxImageBytes: int('FILE_MAX_IMAGE_BYTES', 10 * 1024 * 1024),

@@ -1,3 +1,4 @@
+import { ClassRoomService } from '../classes/class-room.service';
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { IsBoolean, IsIn, IsInt, IsNumber, IsObject, IsOptional, Max, Min, ValidateNested } from 'class-validator';
@@ -61,7 +62,7 @@ export class CallsController {
 /** Provayder webhook'i: autentifikatsiya = provayder imzosi (JWT), xom body (express.raw) bo'yicha. */
 @Controller('calls/webhook')
 export class CallsWebhookController {
-  constructor(private calls: CallsService) {}
+  constructor(private calls: CallsService, private classRoom: ClassRoomService) {}
 
   @Post('provider') @HttpCode(200)
   async provider(@Req() req: any) {
@@ -74,6 +75,7 @@ export class CallsWebhookController {
       throw new UnauthorizedException('Unauthorized');
     }
     await this.calls.handleProviderEvents(events);
+    await this.classRoom.handleEvents(events); // sinf xonalari ('class-' prefiksi); 1:1 oqimga tegmaydi
     return { ok: true };
   }
 }

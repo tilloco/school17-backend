@@ -1,4 +1,4 @@
-import { CallProvider, MintedToken, MintTokenInput, ProviderEvent } from './call-provider';
+import { CallProvider, ClassTokenInput, MintedToken, MintTokenInput, ParticipantPermission, ProviderEvent } from './call-provider';
 import { signHs256, verifyHs256 } from './jwt-hs256';
 
 /**
@@ -25,6 +25,39 @@ export class MockCallProvider implements CallProvider {
       this.secret,
     );
     return { token, url: this.url, expiresAt: new Date(exp * 1000) };
+  }
+
+  // ---- sinf xonasi (R2): test uchun holatni eslab qoladi ----
+  readonly classRooms = new Map<string, { max: number }>();
+  readonly permissions = new Map<string, ParticipantPermission>(); // `${room}|${identity}`
+  readonly attributes = new Map<string, Record<string, string>>();
+  readonly muted: string[] = [];
+  readonly removed: string[] = [];
+
+  async ensureClassRoom(roomName: string, maxParticipants: number) {
+    if (this.closed.has(roomName)) throw new Error('Room closed');
+    this.classRooms.set(roomName, { max: maxParticipants });
+  }
+  async mintClassToken(i: ClassTokenInput): Promise<MintedToken> {
+    const iat = Math.floor(i.now.getTime() / 1000);
+    const exp = iat + i.ttlSeconds;
+    const video = i.isTeacher
+      ? { roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true }
+      : { roomJoin: true, canPublish: i.publishSources.length > 0, canPublishSources: i.publishSources, canSubscribe: true, canPublishData: false, canUpdateOwnMetadata: false };
+    const token = signHs256({ room: i.roomName, sub: i.identity, name: i.displayName, exp, nbf: iat - 5, video }, this.secret);
+    return { token, url: this.url, expiresAt: new Date(exp * 1000) };
+  }
+  async setParticipantPermission(roomName: string, identity: string, perm: ParticipantPermission) {
+    this.permissions.set(`${roomName}|${identity}`, perm);
+  }
+  async setParticipantAttributes(roomName: string, identity: string, attrs: Record<string, string>) {
+    this.attributes.set(`${roomName}|${identity}`, { ...(this.attributes.get(`${roomName}|${identity}`) ?? {}), ...attrs });
+  }
+  async muteParticipant(roomName: string, identity: string) {
+    this.muted.push(`${roomName}|${identity}`);
+  }
+  async removeParticipant(roomName: string, identity: string) {
+    this.removed.push(`${roomName}|${identity}`);
   }
 
   /** Test yordamchisi: provayder tomondan token yaroqliligi (xona yopilganmi, muddati o'tmaganmi) */

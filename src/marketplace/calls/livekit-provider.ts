@@ -1,4 +1,4 @@
-import { CallProvider, MintedToken, MintTokenInput, ProviderEvent } from './call-provider';
+import { CallProvider, ClassTokenInput, MintedToken, MintTokenInput, ParticipantPermission, ProviderEvent } from './call-provider';
 import { sha256Base64, signHs256, verifyHs256 } from './jwt-hs256';
 
 /**
@@ -57,6 +57,38 @@ export class LiveKitCallProvider implements CallProvider {
       this.apiSecret,
     );
     return { token, url: this.wsUrl, expiresAt: new Date(exp * 1000) };
+  }
+
+  // ---- sinf xonasi (R2). HOLAT: UNTESTED haqiqiy serverda; yo'llar va maydonlar joriy hujjatlardan (docs.livekit.io, Twirp RoomService) ----
+  async ensureClassRoom(roomName: string, maxParticipants: number) {
+    // 31 = o'qituvchi + 30 o'quvchi; bo'sh xona 5 daqiqadan keyin o'chadi
+    await this.twirp('CreateRoom', { name: roomName, empty_timeout: 300, max_participants: maxParticipants }, { roomCreate: true });
+  }
+  async mintClassToken(i: ClassTokenInput): Promise<MintedToken> {
+    const iat = Math.floor(i.now.getTime() / 1000);
+    const exp = iat + i.ttlSeconds;
+    const video = i.isTeacher
+      ? { room: i.roomName, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true }
+      : { room: i.roomName, roomJoin: true, canPublish: i.publishSources.length > 0, canPublishSources: i.publishSources, canSubscribe: true, canPublishData: false, canUpdateOwnMetadata: false };
+    const token = signHs256({ iss: this.apiKey, sub: i.identity, name: i.displayName, nbf: iat - 5, exp, video }, this.apiSecret);
+    return { token, url: this.wsUrl, expiresAt: new Date(exp * 1000) };
+  }
+  async setParticipantPermission(roomName: string, identity: string, perm: ParticipantPermission) {
+    // TrackSource: CAMERA=1, MICROPHONE=2
+    const sources = perm.publishSources.map((s) => (s === 'camera' ? 1 : 2));
+    await this.twirp('UpdateParticipant', { room: roomName, identity, permission: { canSubscribe: true, canPublish: perm.canPublish, canPublishData: false, canPublishSources: sources } }, { roomAdmin: true, room: roomName });
+  }
+  async setParticipantAttributes(roomName: string, identity: string, attributes: Record<string, string>) {
+    await this.twirp('UpdateParticipant', { room: roomName, identity, attributes }, { roomAdmin: true, room: roomName });
+  }
+  async muteParticipant(roomName: string, identity: string) {
+    const p: any = await this.twirp('GetParticipant', { room: roomName, identity }, { roomAdmin: true, room: roomName });
+    for (const tr of p?.tracks ?? []) {
+      if (tr.type === 'AUDIO' || tr.type === 0) await this.twirp('MutePublishedTrack', { room: roomName, identity, track_sid: tr.sid, muted: true }, { roomAdmin: true, room: roomName });
+    }
+  }
+  async removeParticipant(roomName: string, identity: string) {
+    await this.twirp('RemoveParticipant', { room: roomName, identity }, { roomAdmin: true, room: roomName });
   }
 
   async closeRoom(roomName: string) {

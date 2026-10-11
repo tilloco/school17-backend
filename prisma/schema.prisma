@@ -1192,6 +1192,15 @@ model ClassSession {
   chatMode      ClassChatMode
   questionsMode ClassQuestionsMode
   cancelledAt   DateTime?
+  locked        Boolean            @default(false)
+  spotlightPupilId String?
+  startedAt     DateTime?
+  endedAt       DateTime?
+  teacherAbsentSince DateTime?
+  teacherNoShow Boolean            @default(false)
+  endReason     String?
+  participants  ClassParticipant[]
+  attendance    ClassAttendance[]
   createdAt     DateTime           @default(now())
 
   @@unique([classId, startAt])
@@ -1220,4 +1229,48 @@ model ClassJoinAttempt {
   at     DateTime
 
   @@index([userId, at])
+}
+
+enum StageState {
+  NONE
+  VOICE
+  VOICE_VIDEO
+}
+
+// R2: sessiyadagi har bir o'quvchining holati (qo'l ko'tarish, sahna, chiqarilgan)
+model ClassParticipant {
+  id            String       @id @default(uuid())
+  sessionId     String
+  session       ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  pupilId       String
+  handRaisedAt  DateTime?
+  stage         StageState   @default(NONE)
+  stageAt       DateTime?
+  removedAt     DateTime? // shu sessiya uchun qayta kirish taqiqlangan
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([sessionId, pupilId])
+  @@index([sessionId, stage])
+}
+
+model ClassAttendance {
+  id            String       @id @default(uuid())
+  sessionId     String
+  session       ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  pupilId       String
+  firstJoinedAt DateTime
+  lastJoinAt    DateTime?
+  lastLeftAt    DateTime?
+  presentNow    Boolean      @default(false)
+  totalSeconds  Int          @default(0)
+  joinCount     Int          @default(0)
+  joinedLate    Boolean      @default(false)
+
+  @@unique([sessionId, pupilId])
+}
+
+// Webhook hodisalarini qayta ishlashda takrorlanishdan himoya
+model ClassRoomEvent {
+  eventKey String   @id
+  at       DateTime
 }

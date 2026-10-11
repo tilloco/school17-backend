@@ -158,7 +158,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
       this.prisma.class.update({ where: { id }, data: { status: 'CANCELLED', cancelledAt: now } }),
       this.prisma.classSession.updateMany({ where: { classId: id, status: { in: ['SCHEDULED', 'LOBBY'] } }, data: { status: 'CANCELLED', cancelledAt: now } }),
     ]);
-    await this.notifyClass(id, 'class.cancelled', { classId: id });
+    await this.notifyClass(id, (uid) => this.notifications.enqueue(uid, 'class.cancelled', { classId: id }));
     await this.audit.log(actor, { action: 'class.cancel', targetType: 'Class', targetId: id });
     return this.teacherView(id);
   }
@@ -170,7 +170,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     if (s.status === 'CANCELLED') return { id: s.id, status: s.status };
     if (s.status !== 'SCHEDULED' && s.status !== 'LOBBY') throw new ConflictException('Session already started or finished');
     await this.prisma.classSession.update({ where: { id: s.id }, data: { status: 'CANCELLED', cancelledAt: this.clock.now() } });
-    await this.notifyClass(classId, 'class.session_cancelled', { classId, sessionId });
+    await this.notifyClass(classId, (uid) => this.notifications.enqueue(uid, 'class.session_cancelled', { classId, sessionId }));
     await this.audit.log(actor, { action: 'class.session.cancel', targetType: 'ClassSession', targetId: s.id });
     return { id: s.id, status: 'CANCELLED' };
   }
@@ -273,7 +273,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
   async removePupil(actor: Actor, classId: string, pupilId: string) {
     await this.ownClass(actor, classId);
     if (!(await this.endEnrollment(classId, pupilId, 'REMOVED'))) throw new NotFoundException('Pupil not found');
-    await this.notifyPupil(pupilId, 'class.removed', { classId });
+    await this.notifyPupil(pupilId, (uid) => this.notifications.enqueue(uid, 'class.removed', { classId }));
     await this.audit.log(actor, { action: 'class.pupil.remove', targetType: 'Class', targetId: classId, metadata: { pupilId } });
     return { ok: true };
   }
@@ -352,12 +352,13 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ---------- bildirishnomalar ----------
-  private async notifyPupil(pupilId: string, type: string, data: Record<string, unknown>) {
+  // Bildirishnoma turi har doim enqueue chaqiruvida literal yoziladi (shablon testi shuni qidiradi)
+  private async notifyPupil(pupilId: string, send: (userId: string) => Promise<unknown>) {
     const ids = [pupilId, ...(await this.guardians.guardianIdsOf(pupilId))];
-    for (const uid of ids) await this.notifications.enqueue(uid, type, data);
+    for (const uid of ids) await send(uid);
   }
-  private async notifyClass(classId: string, type: string, data: Record<string, unknown>) {
+  private async notifyClass(classId: string, send: (userId: string) => Promise<unknown>) {
     const rows = await this.prisma.classEnrollment.findMany({ where: { classId, status: 'ACTIVE' }, select: { pupilId: true } });
-    for (const r of rows) await this.notifyPupil(r.pupilId, type, data);
+    for (const r of rows) await this.notifyPupil(r.pupilId, send);
   }
 }

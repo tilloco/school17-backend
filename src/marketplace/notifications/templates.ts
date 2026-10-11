@@ -67,6 +67,16 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     ru: { title: 'Преподаватель предложил другое время', body: 'Преподаватель предложил другое время для урока. Примите или отклоните.' },
     en: { title: 'The teacher suggested another time', body: 'The teacher suggested a different time for your lesson. Accept or decline it.' },
   },
+  'class.live': {
+    uz: { title: 'Dars boshlandi', body: "Sinf darsi boshlandi. Qo'shilish uchun ilovani oching." },
+    ru: { title: 'Занятие началось', body: 'Занятие класса началось. Откройте приложение, чтобы присоединиться.' },
+    en: { title: 'Class is live', body: 'Your class has started. Open the app to join.' },
+  },
+  'class.teacher_noshow': {
+    uz: { title: "O'qituvchi kelmadi", body: "O'qituvchi darsni boshlamadi. Dars o'tkazilmadi." },
+    ru: { title: 'Преподаватель не пришёл', body: 'Преподаватель не начал занятие. Занятие не состоялось.' },
+    en: { title: 'Teacher did not show up', body: 'The teacher did not start the class, so the session did not take place.' },
+  },
   'class.cancelled': {
     uz: { title: 'Sinf bekor qilindi', body: "O'qituvchi sinfni bekor qildi. Tafsilotlar ilovada." },
     ru: { title: 'Класс отменён', body: 'Преподаватель отменил класс. Подробности в приложении.' },
