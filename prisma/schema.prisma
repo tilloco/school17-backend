@@ -88,6 +88,7 @@ model User {
   blockedBy           UserBlock[]    @relation("BlockedSide")
   linkCodes           GuardianLinkCode[] @relation("LinkCodeStudent")
   consents            Consent[]      @relation("UserConsents")
+  pushTokens          PushToken[]    @relation("UserPushTokens")
   dailyStudyMinutes   Int?
   selfLevel           String?
   onboardingCompleted Boolean @default(false)
@@ -697,6 +698,8 @@ model Notification {
   sentAt    DateTime?
   readAt    DateTime?
   dedupeKey String?
+  attempts  Int                 @default(0)
+  lastError String?
   createdAt DateTime            @default(now())
 
   @@unique([userId, dedupeKey])
@@ -1027,4 +1030,18 @@ model Consent {
 
   @@unique([userId, kind, version])
   @@index([userId, kind])
+}
+
+
+// Push tokenlari (Expo Push). Token — qurilma identifikatori: shaxsiy ma'lumot hisoblanadi, akkaunt o'chirilganda o'chiriladi.
+model PushToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("UserPushTokens", fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
 }

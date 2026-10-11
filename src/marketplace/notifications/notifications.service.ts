@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ClockService } from '../common/clock';
 
 export interface EnqueueOptions {
   dueAt?: Date;
@@ -14,12 +15,12 @@ export interface EnqueueOptions {
  */
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private clock: ClockService) {}
 
   async enqueue(userId: string, type: string, data: Record<string, unknown>, opts: EnqueueOptions = {}) {
     try {
       return await this.prisma.notification.create({
-        data: { userId, type, data: data as Prisma.InputJsonValue, dueAt: opts.dueAt ?? new Date(), dedupeKey: opts.dedupeKey },
+        data: { userId, type, data: data as Prisma.InputJsonValue, dueAt: opts.dueAt ?? this.clock.now(), createdAt: this.clock.now(), dedupeKey: opts.dedupeKey },
       });
     } catch (e: any) {
       if (e?.code === 'P2002') return null; // dublikat dedupeKey
@@ -36,7 +37,7 @@ export class NotificationsService {
 
   listForUser(userId: string, take = 50, unreadOnly = false) {
     return this.prisma.notification.findMany({
-      where: { userId, dueAt: { lte: new Date() }, ...(unreadOnly ? { readAt: null } : {}) },
+      where: { userId, dueAt: { lte: this.clock.now() }, ...(unreadOnly ? { readAt: null } : {}) },
       orderBy: { createdAt: 'desc' },
       take: Math.min(take, 100),
     });

@@ -61,6 +61,7 @@ export class PrivacyService {
       await tx.userBlock.deleteMany({ where: { OR: [{ blockerId: actor.id }, { blockedId: actor.id }] } });
       await tx.notification.deleteMany({ where: { userId: actor.id } });
       await tx.callEvent.deleteMany({ where: { userId: actor.id } });
+      await tx.pushToken.deleteMany({ where: { userId: actor.id } });
       // 5) eski imtihon ilovasi ma'lumotlari (kaskad bilan)
       await tx.userProgress.deleteMany({ where: { userId: actor.id } });
       await tx.userAnswer.deleteMany({ where: { userId: actor.id } });
