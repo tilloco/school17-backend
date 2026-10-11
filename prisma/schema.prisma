@@ -74,6 +74,8 @@ model User {
   deletedAt           DateTime?
   guardianLinksAsGuardian GuardianLink[] @relation("GuardianSide")
   guardianLinksAsStudent  GuardianLink[] @relation("StudentSide")
+  teacherProfile      TeacherProfile? @relation("TeacherProfileUser")
+  storedFiles         StoredFile[]   @relation("FileOwner")
   dailyStudyMinutes   Int?
   selfLevel           String?
   onboardingCompleted Boolean @default(false)
@@ -467,4 +469,129 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([targetType, targetId])
   @@index([action, createdAt])
+}
+
+// ---------------- Marketplace: o'qituvchi profillari (S2) ----------------
+
+enum VerificationStatus {
+  DRAFT
+  PENDING
+  VERIFIED
+  REJECTED
+  SUSPENDED
+}
+
+enum CredentialKind {
+  DEGREE
+  CERTIFICATE
+  ID_DOCUMENT
+  OTHER
+}
+
+enum CredentialStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum StoredFilePurpose {
+  CREDENTIAL
+  MESSAGE_ATTACHMENT
+  AVATAR
+}
+
+enum StoredFileStatus {
+  PENDING_UPLOAD
+  UPLOADED
+  QUARANTINED
+  READY
+  REJECTED
+}
+
+model StoredFile {
+  id           String            @id @default(uuid())
+  ownerId      String
+  owner        User              @relation("FileOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  purpose      StoredFilePurpose
+  originalName String
+  mime         String?
+  sizeBytes    Int               @default(0)
+  declaredSize Int               @default(0)
+  storageKey   String            @unique
+  sha256       String?
+  status       StoredFileStatus  @default(PENDING_UPLOAD)
+  createdAt    DateTime          @default(now())
+  credentials  TeacherCredential[]
+
+  @@index([ownerId, createdAt])
+}
+
+model TeacherProfile {
+  id                 String             @id @default(uuid())
+  userId             String             @unique
+  user               User               @relation("TeacherProfileUser", fields: [userId], references: [id], onDelete: Cascade)
+  headline           String             @default("")
+  bio                String             @default("") @db.Text
+  subjects           String[]
+  levels             String[]
+  languages          String[]
+  priceMinor         Int                @default(0) // 60 daqiqalik dars narxi, tiyin (1 so'm = 100 tiyin)
+  currency           String             @default("UZS")
+  introVideoUrl      String?
+  instantBooking     Boolean            @default(false)
+  verificationStatus VerificationStatus @default(DRAFT)
+  verifiedAt         DateTime?
+  verifiedByAdminId  String?
+  rejectionReason    String?
+  submittedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  ratingCount        Int                @default(0)
+  ratingSum          Int                @default(0)
+  ratingBayes        Float              @default(0)
+
+  availability AvailabilityRule[]
+  timeOff      TeacherTimeOff[]
+  credentials  TeacherCredential[]
+
+  @@index([verificationStatus])
+  @@index([priceMinor])
+}
+
+model AvailabilityRule {
+  id          String         @id @default(uuid())
+  teacherId   String
+  teacher     TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  weekday     Int // ISO: 1=Dushanba ... 7=Yakshanba (o'qituvchining o'z vaqt zonasida)
+  startMinute Int // kun boshidan daqiqalar (mahalliy vaqt)
+  endMinute   Int
+
+  @@index([teacherId, weekday])
+}
+
+model TeacherTimeOff {
+  id        String         @id @default(uuid())
+  teacherId String
+  teacher   TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  startAt   DateTime
+  endAt     DateTime
+  reason    String?
+
+  @@index([teacherId, startAt])
+}
+
+model TeacherCredential {
+  id           String           @id @default(uuid())
+  teacherId    String
+  teacher      TeacherProfile   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  kind         CredentialKind
+  title        String
+  fileId       String
+  file         StoredFile       @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  status       CredentialStatus @default(PENDING)
+  reviewedAt   DateTime?
+  reviewNote   String?
+  createdAt    DateTime         @default(now())
+
+  @@index([teacherId])
 }

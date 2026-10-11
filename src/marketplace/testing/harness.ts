@@ -159,6 +159,49 @@ export function isDenied(status: number): boolean {
   return status === 403 || status === 404;
 }
 
+export async function makeFile(
+  t: TestApp,
+  ownerId: string,
+  opts: { purpose?: 'CREDENTIAL' | 'MESSAGE_ATTACHMENT' | 'AVATAR'; status?: 'PENDING_UPLOAD' | 'UPLOADED' | 'QUARANTINED' | 'READY' | 'REJECTED' } = {},
+) {
+  const id = randomUUID();
+  return t.prisma.storedFile.create({
+    data: {
+      id,
+      ownerId,
+      purpose: opts.purpose ?? 'CREDENTIAL',
+      originalName: 'diploma.pdf',
+      mime: 'application/pdf',
+      sizeBytes: 1000,
+      storageKey: `test/${id}`,
+      status: opts.status ?? 'READY',
+    },
+  });
+}
+
+export const GOOD_PROFILE = {
+  headline: 'Experienced math tutor',
+  bio: 'I teach mathematics to school pupils and applicants for ten years. '.repeat(2),
+  subjects: ['math'],
+  levels: ['grades_10_11'],
+  languages: ['uz', 'ru'],
+  priceMinor: 5_000_000,
+};
+
+/** To'liq to'ldirilgan, tekshiruvga tayyor (yoki tasdiqlangan) o'qituvchi yaratadi. */
+export async function makeTeacher(t: TestApp, opts: { submit?: boolean; approve?: { adminToken: string } } = {}) {
+  const user = await makeUser(t, Role.TEACHER);
+  const c = api(t, user.token);
+  const prof = await c.put('/teachers/me/profile', GOOD_PROFILE);
+  if (prof.status !== 200) throw new Error(`profile failed ${prof.status} ${JSON.stringify(prof.body)}`);
+  await c.put('/teachers/me/availability', { rules: [1, 2, 3, 4, 5].map((d) => ({ weekday: d, start: '09:00', end: '18:00' })) });
+  const file = await makeFile(t, user.id);
+  await c.post('/teachers/me/credentials', { kind: 'DEGREE', title: 'BSc Mathematics', fileId: file.id });
+  if (opts.submit || opts.approve) await c.post('/teachers/me/submit');
+  if (opts.approve) await api(t, opts.approve.adminToken).post(`/admin/market/teachers/${prof.body.id}/approve`);
+  return { user, profileId: prof.body.id as string };
+}
+
 export interface RouteSpec {
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   path: string;
