@@ -9,6 +9,7 @@ import { CALL_PROVIDER, CallProvider, ProviderEvent, PublishSource } from '../ca
 import { NotificationsService } from '../notifications/notifications.service';
 import { firstName } from './class-rules';
 import { ClassPaymentsService } from './class-payments.service';
+import { ClassFeedService } from './class-feed.service';
 
 export const classRoomName = (sessionId: string) => `class-${sessionId}`;
 const sourcesFor = (s: StageState): PublishSource[] => (s === 'VOICE' ? ['microphone'] : s === 'VOICE_VIDEO' ? ['microphone', 'camera'] : []);
@@ -24,6 +25,7 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
     private audit: AuditService,
     private notifications: NotificationsService,
     private payments: ClassPaymentsService,
+    private feedSvc: ClassFeedService,
     @Inject(CALL_PROVIDER) private provider: CallProvider,
   ) {}
 
@@ -84,6 +86,7 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
     const fresh = await this.prisma.classSession.findUniqueOrThrow({ where: { id: s.id } });
     if (!r.count) return fresh;
     await this.closePresences(s.id, now);
+    await this.feedSvc.buildRecap(s.id).catch((e) => this.log.warn(`recap: ${e.message}`));
     await this.prisma.classParticipant.updateMany({ where: { sessionId: s.id }, data: { stage: 'NONE', handRaisedAt: null } });
     if (was === 'LIVE') await this.provider.closeRoom(classRoomName(s.id)).catch((e) => this.log.warn(`closeRoom: ${e.message}`));
     if (teacherNoShow) await this.payments.waiveSession(s.id).catch((e) => this.log.warn(`waive: ${e.message}`));

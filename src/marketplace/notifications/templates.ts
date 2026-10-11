@@ -82,6 +82,26 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     ru: { title: 'Напоминание об оплате', body: 'Преподаватель напомнил об оплате занятий класса. Подробности в приложении.' },
     en: { title: 'Payment reminder', body: 'Your teacher reminded you about the class payment. See the app for details.' },
   },
+  'class.reminder_day': {
+    uz: { title: 'Ertaga dars', body: 'Sinf darsi 24 soatdan keyin boshlanadi. Tafsilotlar ilovada.' },
+    ru: { title: 'Занятие завтра', body: 'Занятие класса начнётся через 24 часа. Подробности в приложении.' },
+    en: { title: 'Class tomorrow', body: 'Your class starts in 24 hours. See the app for details.' },
+  },
+  'class.reminder_soon': {
+    uz: { title: 'Dars 30 daqiqadan keyin', body: 'Sinf darsi 30 daqiqadan keyin boshlanadi. Tayyorlaning.' },
+    ru: { title: 'Занятие через 30 минут', body: 'Занятие класса начнётся через 30 минут. Приготовьтесь.' },
+    en: { title: 'Class in 30 minutes', body: 'Your class starts in 30 minutes. Get ready.' },
+  },
+  'class.homework': {
+    uz: { title: 'Yangi uy vazifasi', body: "O'qituvchi sinf uchun uy vazifasi berdi. Tafsilotlar ilovada." },
+    ru: { title: 'Новое домашнее задание', body: 'Преподаватель задал домашнее задание классу. Подробности в приложении.' },
+    en: { title: 'New homework', body: 'Your teacher set homework for the class. See the app for details.' },
+  },
+  'class.homework_marked': {
+    uz: { title: 'Uy vazifasi baholandi', body: 'O\'qituvchi uy vazifangizni baholadi.' },
+    ru: { title: 'Задание проверено', body: 'Преподаватель проверил домашнее задание.' },
+    en: { title: 'Homework marked', body: 'Your teacher marked the homework.' },
+  },
   'class.cancelled': {
     uz: { title: 'Sinf bekor qilindi', body: "O'qituvchi sinfni bekor qildi. Tafsilotlar ilovada." },
     ru: { title: 'Класс отменён', body: 'Преподаватель отменил класс. Подробности в приложении.' },

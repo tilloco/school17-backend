@@ -9,6 +9,7 @@ import { GuardianService } from '../guardian/guardian.service';
 import { LegalService } from '../legal/legal.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { BlocksService } from '../safety/blocks.service';
+import { ClassRemindersService } from './class-reminders.service';
 import { firstName, hashSecret, newInviteToken, newJoinCode, normalizeCode, ScheduleInput, sessionTimes } from './class-rules';
 
 const WEEK_MS = 7 * 86_400_000;
@@ -49,6 +50,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     private notifications: NotificationsService,
     private blocks: BlocksService,
     private legal: LegalService,
+    private reminders: ClassRemindersService,
   ) {}
 
   onModuleInit() {
@@ -161,6 +163,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
       this.prisma.class.update({ where: { id }, data: { status: 'CANCELLED', cancelledAt: now } }),
       this.prisma.classSession.updateMany({ where: { classId: id, status: { in: ['SCHEDULED', 'LOBBY'] } }, data: { status: 'CANCELLED', cancelledAt: now } }),
     ]);
+    await this.reminders.cancelClass(id);
     await this.notifyClass(id, (uid) => this.notifications.enqueue(uid, 'class.cancelled', { classId: id }));
     await this.audit.log(actor, { action: 'class.cancel', targetType: 'Class', targetId: id });
     return this.teacherView(id);
@@ -173,6 +176,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     if (s.status === 'CANCELLED') return { id: s.id, status: s.status };
     if (s.status !== 'SCHEDULED' && s.status !== 'LOBBY') throw new ConflictException('Session already started or finished');
     await this.prisma.classSession.update({ where: { id: s.id }, data: { status: 'CANCELLED', cancelledAt: this.clock.now() } });
+    await this.reminders.cancelSession(sessionId);
     await this.notifyClass(classId, (uid) => this.notifications.enqueue(uid, 'class.session_cancelled', { classId, sessionId }));
     await this.audit.log(actor, { action: 'class.session.cancel', targetType: 'ClassSession', targetId: s.id });
     return { id: s.id, status: 'CANCELLED' };
@@ -202,6 +206,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
         skipDuplicates: true,
       });
       created += res.count;
+      await this.reminders.sync(c.id);
     }
     return created;
   }
@@ -261,6 +266,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
       else await tx.classEnrollment.create({ data: { classId: c.id, pupilId: studentId, enrolledById: actor.id } });
     });
     await this.audit.log(actor, { action: 'class.enroll', targetType: 'Class', targetId: c.id, metadata: { pupilId: studentId } });
+    await this.reminders.sync(c.id);
     return this.participantView(actor, c.id);
   }
 
@@ -276,6 +282,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
   async removePupil(actor: Actor, classId: string, pupilId: string) {
     await this.ownClass(actor, classId);
     if (!(await this.endEnrollment(classId, pupilId, 'REMOVED'))) throw new NotFoundException('Pupil not found');
+    await this.reminders.cancelForPupil(classId, pupilId);
     await this.notifyPupil(pupilId, (uid) => this.notifications.enqueue(uid, 'class.removed', { classId }));
     await this.audit.log(actor, { action: 'class.pupil.remove', targetType: 'Class', targetId: classId, metadata: { pupilId } });
     return { ok: true };
@@ -286,6 +293,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     const target = pupilId ?? actor.id;
     if (!seats.includes(target)) throw new NotFoundException('Class not found');
     if (!(await this.endEnrollment(classId, target, 'LEFT'))) throw new NotFoundException('Class not found');
+    await this.reminders.cancelForPupil(classId, target);
     return { ok: true };
   }
 

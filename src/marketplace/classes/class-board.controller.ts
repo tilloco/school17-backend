@@ -25,9 +25,6 @@ export class ClassBoardController {
   @Post('class-sessions/:sid/whiteboard/save') @HttpCode(201) @RequirePermission('class.manage')
   save(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: SaveDto) { return this.board.save(a, sid, !!dto.clear); }
 
-  @Get('classes/:id/feed') @RequirePermission('class.read')
-  feed(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Query('before') before?: string) { return this.board.feed(a, id, before); }
-
   @Throttle({ default: { limit: 300, ttl: 60_000 } })
   @Get('classes/:id/feed/:pid/image') @RequirePermission('class.read')
   async image(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('pid', ParseUUIDPipe) pid: string, @Res() res: any) {

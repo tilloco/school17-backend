@@ -204,7 +204,7 @@ export class ClassFilesService implements OnModuleInit {
       if (f.renderStatus === 'FAILED') throw new ConflictException({ message: 'This file could not be prepared', code: 'RENDER_FAILED' });
       if (!Number.isInteger(page) || page < 1 || page > Math.max(f.renderedPages, 1) || (f.renderedPages === 0)) throw new ConflictException({ message: 'That page is not ready yet', code: 'PAGE_NOT_READY' });
     }
-    await this.prisma.classSession.update({ where: { id: sessionId }, data: { presentFileId: fileId, presentPage: fileId ? page : 1 } });
+    await this.prisma.classSession.update({ where: { id: sessionId }, data: { presentFileId: fileId, presentPage: fileId ? page : 1, ...(fileId && !s.presentedFileIds.includes(fileId) ? { presentedFileIds: { push: fileId } } : {}) } });
     for (const u of await this.audience(s.classId, s.class.teacher.userId)) this.realtime.emitToUser(u, 'class:present', { sessionId, fileId, page: fileId ? page : null });
     return { fileId, page: fileId ? page : null };
   }

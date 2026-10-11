@@ -516,6 +516,7 @@ enum StoredFilePurpose {
   MESSAGE_ATTACHMENT
   AVATAR
   CLASS_FILE
+  HOMEWORK
 }
 
 enum FileScanStatus {
@@ -1212,6 +1213,7 @@ model ClassSession {
   messages      ClassMessage[]
   presentFileId String?
   whiteboardRev Int                @default(0)
+  presentedFileIds String[]        @default([])
   presentPage   Int                @default(1)
   questions     ClassQuestion[]
   attendance    ClassAttendance[]
@@ -1386,6 +1388,10 @@ model ClassAnnotation {
 
 enum ClassFeedKind {
   WHITEBOARD
+  NOTE
+  HOMEWORK
+  RECAP
+  ANSWER
 }
 
 // Teacher doskasining oxirgi holati (vektor); yangi qo'shilgan va qayta ulangan mijozlar shuni oladi
@@ -1405,6 +1411,10 @@ model ClassFeedPost {
   authorId  String
   text      String?
   imageKey  String?
+  title     String?
+  data      Json?
+  editedAt  DateTime?
+  noteKey   String?       @unique // NOTE/RECAP uchun "kind:sessionId": bir sessiyaga bittadan
   createdAt DateTime
 
   @@index([classId, createdAt])
@@ -1435,4 +1445,41 @@ model ClassPayment {
   @@unique([classId, pupilId, periodKey])
   @@index([classId, periodKey, status])
   @@index([pupilId, status])
+}
+
+// Sessiya tugagach yig'iladigan xulosa (to'liq, o'qituvchi ko'rinishi); o'quvchi va vasiyga rolga qarab kesilgan ko'rinish beriladi
+model ClassSessionRecap {
+  sessionId String   @id
+  data      Json
+  createdAt DateTime
+}
+
+model ClassHomework {
+  id          String   @id @default(uuid())
+  classId     String
+  feedPostId  String?
+  title       String
+  text        String   @default("")
+  dueAt       DateTime
+  createdAt   DateTime
+  submissions ClassHomeworkSubmission[]
+
+  @@index([classId, dueAt])
+}
+
+model ClassHomeworkSubmission {
+  id          String        @id @default(uuid())
+  homeworkId  String
+  homework    ClassHomework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  pupilId     String
+  text        String        @default("")
+  fileId      String?
+  submittedAt DateTime
+  late        Boolean       @default(false)
+  score       Int?
+  comment     String?
+  markedAt    DateTime?
+
+  @@unique([homeworkId, pupilId])
+  @@index([pupilId])
 }

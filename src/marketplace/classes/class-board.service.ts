@@ -89,12 +89,6 @@ export class ClassBoardService {
     const e = seats.length ? await this.prisma.classEnrollment.findFirst({ where: { classId, pupilId: { in: seats }, status: 'ACTIVE' }, select: { id: true } }) : null;
     if (!e) throw new NotFoundException('Class not found');
   }
-  async feed(actor: Actor, classId: string, before?: string) {
-    await this.member(actor, classId);
-    const b = before ? new Date(before) : null;
-    const rows = await this.prisma.classFeedPost.findMany({ where: { classId, ...(b && !isNaN(b.getTime()) ? { createdAt: { lt: b } } : {}) }, orderBy: { createdAt: 'desc' }, take: 30 });
-    return rows.map((r) => ({ id: r.id, kind: r.kind, sessionId: r.sessionId, text: r.text, hasImage: !!r.imageKey, at: r.createdAt }));
-  }
   async feedImage(actor: Actor, classId: string, postId: string): Promise<Buffer> {
     await this.member(actor, classId);
     const p = await this.prisma.classFeedPost.findFirst({ where: { id: postId, classId, imageKey: { not: null } } });

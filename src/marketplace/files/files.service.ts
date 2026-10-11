@@ -23,7 +23,7 @@ const ALLOWED_DECLARED_MIME: Record<string, DetectedType> = {
   'application/pdf': 'pdf',
 };
 
-const PURPOSES_FOR_USERS: StoredFilePurpose[] = ['CREDENTIAL', 'MESSAGE_ATTACHMENT', 'AVATAR', 'PAYMENT_PROOF', 'CLASS_FILE'];
+const PURPOSES_FOR_USERS: StoredFilePurpose[] = ['CREDENTIAL', 'MESSAGE_ATTACHMENT', 'AVATAR', 'PAYMENT_PROOF', 'CLASS_FILE', 'HOMEWORK'];
 
 const newKey = () => `f_${randomBytes(16).toString('hex')}`;
 
@@ -56,6 +56,7 @@ export class FilesService {
     const type = ALLOWED_DECLARED_MIME[input.mime];
     if (!type) throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
     if ((input.purpose === 'AVATAR' || input.purpose === 'PAYMENT_PROOF') && type === 'pdf') throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
+    if (input.purpose === 'HOMEWORK' && actor.role !== 'STUDENT' && actor.role !== 'GUARDIAN') throw new ForbiddenException('Forbidden');
     if (input.purpose === 'CLASS_FILE' && (actor.role !== 'TEACHER' || type !== 'pdf')) throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
     const limit = input.purpose === 'CLASS_FILE' ? cfg.classFileMaxBytes : input.purpose === 'PAYMENT_PROOF' ? cfg.fileMaxProofBytes : type === 'pdf' ? cfg.fileMaxPdfBytes : cfg.fileMaxImageBytes;
     if (!Number.isInteger(input.size) || input.size <= 0) throw new BadRequestException('Bad size');
@@ -214,6 +215,14 @@ export class FilesService {
       if (!m || m.deletedAt) return false;
       if (m.thread.teacherUserId === actor.id || m.thread.studentUserId === actor.id) return true;
       if (actor.role === 'GUARDIAN' && (await this.guardians.isActiveGuardianOf(actor.id, m.thread.studentUserId))) return true;
+    }
+    if (file.purpose === 'HOMEWORK') {
+      // Uy vazifasi fayli: topshirgan (egasi), sinf o'qituvchisi va o'quvchining bog'langan vasiylari
+      const sub = await this.prisma.classHomeworkSubmission.findFirst({ where: { fileId: file.id }, include: { homework: { include: { } } } });
+      if (!sub) return false;
+      const cls = await this.prisma.class.findUnique({ where: { id: sub.homework.classId }, select: { teacher: { select: { userId: true } } } });
+      if (cls?.teacher.userId === actor.id) return true;
+      return actor.role === 'GUARDIAN' && (await this.guardians.isActiveGuardianOf(actor.id, sub.pupilId));
     }
     if (file.purpose === 'CLASS_FILE') {
       // Sinf PDF'ini asl holida faqat o'qituvchi (egasi) yoki, agar o'qituvchi ruxsat bergan bo'lsa, sinf a'zolari yuklab oladi
