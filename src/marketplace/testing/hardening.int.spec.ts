@@ -26,7 +26,7 @@ describe('route inventory (static): every endpoint is guarded and permissioned',
       if (!m) return;
       // sinf boshidagi dekoratorlar: oldingi 4 qatorgacha
       const head = lines.slice(Math.max(0, i - 4), i + 1).join('\n');
-      const guarded = /@UseGuards\((UserActorGuard|AdminActorGuard)\)/.test(head);
+      const guarded = /@UseGuards\([^)]*(UserActorGuard|AdminActorGuard)[^)]*\)/.test(head);
       const handlers: { line: string; permissioned: boolean }[] = [];
       for (let j = i + 1; j < lines.length && !/^export class /.test(lines[j]); j++) {
         if (/@(Get|Post|Put|Patch|Delete)\(/.test(lines[j])) {

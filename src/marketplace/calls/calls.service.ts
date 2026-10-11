@@ -140,7 +140,7 @@ export class CallsService implements OnModuleInit, OnModuleDestroy {
     }
     if (b.student.status !== 'ACTIVE') throw new ConflictException('Participant unavailable');
     await this.blocks.assertNotBlocked(b.teacher.userId, b.studentId);
-    if (marketConfig().paymentRequiredForCalls && !(await this.payments.isPaid(b.id))) {
+    if (marketConfig().escrowEnabled && marketConfig().paymentRequiredForCalls && !(await this.payments.isPaid(b.id))) {
       throw new HttpException({ statusCode: 402, message: 'Payment required', code: 'PAYMENT_REQUIRED' }, HttpStatus.PAYMENT_REQUIRED);
     }
     const room = await this.activeRoom(b);

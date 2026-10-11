@@ -51,6 +51,7 @@ describe('payments, ledger, earnings (integration, MOCK provider)', () => {
   }
 
   before(async () => {
+    process.env.ESCROW_ENABLED = 'true'; // S8 kodi faqat shu bayroq bilan ishlaydi (bepul rejimda o'chiq)
     t = await createTestApp();
     clock = t.app.get(ClockService);
     clock.set(NOW);
@@ -61,6 +62,7 @@ describe('payments, ledger, earnings (integration, MOCK provider)', () => {
     payments = t.app.get(PaymentsService);
   });
   after(async () => {
+    delete process.env.ESCROW_ENABLED;
     clock.set(null);
     await t.close();
   });

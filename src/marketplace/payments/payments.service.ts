@@ -10,6 +10,7 @@ import { marketConfig } from '../common/config';
 import { DomainEvents } from '../common/events';
 import { NotificationsService } from '../notifications/notifications.service';
 import { InsufficientFunds, LedgerService } from './ledger.service';
+import { marketConfig as _cfg } from '../common/config';
 import { commissionFor, earnedForDuration, looksLikeCardNumber, refundForBps } from './money';
 import { PAYMENT_PROVIDER, PaymentProvider } from './payment-provider';
 
@@ -31,14 +32,16 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.events.on('booking.completed', ({ bookingId, billableSeconds }) => this.onCompleted(bookingId, billableSeconds));
-    this.events.on('booking.noshow', ({ bookingId, kind }) => (kind === 'NO_SHOW_STUDENT' ? this.settleFull(bookingId) : this.refundAll(bookingId, 'teacher_no_show')));
-    this.events.on('booking.failed', ({ bookingId }) => this.flagForReview(bookingId));
-    this.events.on('booking.cancelled', ({ bookingId }) => this.onCancelled(bookingId));
-    this.events.on('booking.declined', ({ bookingId }) => this.refundAll(bookingId, 'declined'));
-    this.events.on('booking.expired', ({ bookingId }) => this.refundAll(bookingId, 'expired'));
+    // Bepul rejim: ESCROW_ENABLED o'chiq bo'lsa hodisalar hech qanday LessonPayment/daftar yozuvini yaratmaydi yoki o'zgartirmaydi.
+    const on = <T>(fn: (p: T) => Promise<void>) => (p: T) => (_cfg().escrowEnabled ? fn(p) : undefined);
+    this.events.on('booking.completed', on(({ bookingId, billableSeconds }: { bookingId: string; billableSeconds: number }) => this.onCompleted(bookingId, billableSeconds)));
+    this.events.on('booking.noshow', on(({ bookingId, kind }: { bookingId: string; kind: string }) => (kind === 'NO_SHOW_STUDENT' ? this.settleFull(bookingId) : this.refundAll(bookingId, 'teacher_no_show'))));
+    this.events.on('booking.failed', on(({ bookingId }: { bookingId: string }) => this.flagForReview(bookingId)));
+    this.events.on('booking.cancelled', on(({ bookingId }: { bookingId: string }) => this.onCancelled(bookingId)));
+    this.events.on('booking.declined', on(({ bookingId }: { bookingId: string }) => this.refundAll(bookingId, 'declined')));
+    this.events.on('booking.expired', on(({ bookingId }: { bookingId: string }) => this.refundAll(bookingId, 'expired')));
     if (process.env.NODE_ENV === 'test') return;
-    this.timer = setInterval(() => void this.releaseDue().catch((e) => this.log.error(e.message)), 5 * 60_000);
+    this.timer = setInterval(() => { if (_cfg().escrowEnabled) void this.releaseDue().catch((e) => this.log.error(e.message)); }, 5 * 60_000);
     this.timer.unref();
   }
 

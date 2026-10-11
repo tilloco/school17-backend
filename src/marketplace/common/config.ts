@@ -44,5 +44,7 @@ export function marketConfig() {
     holdHours: int('PAYMENT_HOLD_HOURS', 24), // dars tugagach pul shuncha soat "ushlab turiladi" (nizo oynasi)
     minPayoutMinor: int('MIN_PAYOUT_MINOR', 5_000_000), // 50 000 so'm
     paymentRequiredForCalls: process.env.PAYMENT_REQUIRED_FOR_CALLS === 'true',
+    // School17 BEPUL: platforma pul ushlamaydi. Eski to'lov/daftar kodi (S8) o'chirilmagan, lekin ESCROW_ENABLED=true bo'lmasa ISHLAMAYDI.
+    escrowEnabled: process.env.ESCROW_ENABLED === 'true',
   };
 }

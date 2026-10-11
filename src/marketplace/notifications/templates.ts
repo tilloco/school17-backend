@@ -18,9 +18,9 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     en: { title: 'Lesson confirmed', body: 'Your lesson is confirmed. See the time under "My lessons".' },
   },
   'booking.declined': {
-    uz: { title: 'So\'rov rad etildi', body: 'O\'qituvchi dars so\'rovini rad etdi. To\'langan pul qaytariladi.' },
-    ru: { title: 'Заявка отклонена', body: 'Преподаватель отклонил заявку. Оплата будет возвращена.' },
-    en: { title: 'Request declined', body: 'The teacher declined the request. Any payment will be refunded.' },
+    uz: { title: 'So\'rov rad etildi', body: 'O\'qituvchi dars so\'rovini rad etdi. Boshqa vaqt yoki o\'qituvchi tanlang.' },
+    ru: { title: 'Заявка отклонена', body: 'Преподаватель отклонил заявку. Выберите другое время или преподавателя.' },
+    en: { title: 'Request declined', body: 'The teacher declined the request. Pick another time or teacher.' },
   },
   'booking.cancelled': {
     uz: { title: 'Dars bekor qilindi', body: 'Dars bekor qilindi. Tafsilotlar ilovada.' },
@@ -28,9 +28,9 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     en: { title: 'Lesson cancelled', body: 'A lesson was cancelled. Details are in the app.' },
   },
   'booking.expired': {
-    uz: { title: 'So\'rov muddati tugadi', body: 'O\'qituvchi javob bermadi, so\'rov bekor bo\'ldi. To\'langan pul qaytariladi.' },
-    ru: { title: 'Срок заявки истёк', body: 'Преподаватель не ответил, заявка отменена. Оплата будет возвращена.' },
-    en: { title: 'Request expired', body: 'The teacher did not reply and the request expired. Any payment will be refunded.' },
+    uz: { title: 'So\'rov muddati tugadi', body: 'O\'qituvchi javob bermadi, so\'rov bekor bo\'ldi. Boshqa vaqtni tanlang.' },
+    ru: { title: 'Срок заявки истёк', body: 'Преподаватель не ответил, заявка отменена. Выберите другое время.' },
+    en: { title: 'Request expired', body: 'The teacher did not reply and the request expired. Pick another time.' },
   },
   'booking.reminder': {
     uz: { title: 'Dars eslatmasi', body: 'Dars tez orada boshlanadi. Aloqa va qurilmalaringizni tekshiring.' },

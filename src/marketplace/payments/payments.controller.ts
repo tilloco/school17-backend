@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Actor } from '../common/actor';
 import { AdminActorGuard, CurrentActor, RequirePermission, UserActorGuard } from '../common/actor.guard';
+import { EscrowEnabledGuard } from './escrow.guard';
 import { PaymentsService } from './payments.service';
 
 class PayDto {
@@ -31,7 +32,7 @@ function key(h?: string): string {
 }
 
 @Controller()
-@UseGuards(UserActorGuard)
+@UseGuards(EscrowEnabledGuard, UserActorGuard)
 export class PaymentsController {
   constructor(private payments: PaymentsService) {}
 
@@ -60,7 +61,7 @@ export class PaymentsController {
 }
 
 @Controller('admin/market')
-@UseGuards(AdminActorGuard)
+@UseGuards(EscrowEnabledGuard, AdminActorGuard)
 export class PaymentsAdminController {
   constructor(private payments: PaymentsService) {}
 
