@@ -156,9 +156,16 @@ export class CallsService implements OnModuleInit, OnModuleDestroy {
   private async activeRoom(b: Booking): Promise<CallRoom> {
     let room = await this.prisma.callRoom.findFirst({ where: { bookingId: b.id, status: 'ACTIVE' }, orderBy: { createdAt: 'desc' } });
     if (!room) {
-      room = await this.prisma.callRoom.create({
-        data: { bookingId: b.id, roomName: newRoomName(), provider: this.provider.name, teacherKey: newKey(), studentKey: newKey() },
-      });
+      try {
+        room = await this.prisma.callRoom.create({
+          data: { bookingId: b.id, roomName: newRoomName(), provider: this.provider.name, teacherKey: newKey(), studentKey: newKey() },
+        });
+      } catch (e: any) {
+        // Ikkala ishtirokchi bir vaqtda token so'rasa: yagona faol xona indeksi (P2002) ikkinchisini mavjud xonaga yo'naltiradi
+        if (e?.code !== 'P2002') throw e;
+        room = await this.prisma.callRoom.findFirst({ where: { bookingId: b.id, status: 'ACTIVE' } });
+        if (!room) throw e;
+      }
     }
     await this.provider.ensureRoom(room.roomName);
     return room;

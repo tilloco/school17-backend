@@ -115,6 +115,16 @@ describe('video calls (integration, mock provider)', () => {
     assert.ok(provider.verifyToken(lateTok.token, clock.now())!.exp - Math.floor(clock.now().getTime() / 1000) <= 31);
   });
 
+  it('race: both participants request a token at the same moment => they land in the SAME room', async () => {
+    const x = await lesson();
+    clock.set(at('04:58:00'));
+    const [a, b] = await Promise.all([token(x.teacher, x.bookingId), token(x.student, x.bookingId)]);
+    assert.equal(a.status, 200);
+    assert.equal(b.status, 200);
+    assert.equal(await t.prisma.callRoom.count({ where: { bookingId: x.bookingId, status: 'ACTIVE' } }), 1);
+    assert.equal(provider.verifyToken(a.body.token, clock.now())!.room, provider.verifyToken(b.body.token, clock.now())!.room);
+  });
+
   it('different bookings never share rooms', async () => {
     const a = await lesson();
     const b = await lesson();
