@@ -30,6 +30,8 @@ export interface ClassInput {
   stageMode?: 'LISTEN_ONLY' | 'HAND_RAISE' | 'OPEN_STAGE';
   chatMode?: 'OPEN' | 'QUESTIONS_ONLY' | 'OFF';
   questionsMode?: 'OPEN' | 'OFF';
+  slowModeSeconds?: number;
+  handRaiseOn?: boolean;
   allowDownload?: boolean;
   requirePaidToJoin?: boolean;
   firstSessionTrial?: boolean;
@@ -137,13 +139,14 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     if (input.capacity !== undefined && input.capacity < c.enrolledCount) throw new ConflictException({ message: 'Capacity is below the number of enrolled pupils', code: 'CAPACITY_BELOW_ENROLLED' });
     const data: Prisma.ClassUpdateInput = {};
     for (const k of ['title', 'subject', 'description'] as const) if (input[k] !== undefined) data[k] = String(input[k]).trim();
-    for (const k of ['capacity', 'priceMinor', 'priceModel', 'stageMode', 'chatMode', 'questionsMode', 'allowDownload', 'requirePaidToJoin', 'firstSessionTrial'] as const) if (input[k] !== undefined) (data as any)[k] = input[k];
+    for (const k of ['capacity', 'priceMinor', 'priceModel', 'stageMode', 'chatMode', 'questionsMode', 'slowModeSeconds', 'handRaiseOn', 'allowDownload', 'requirePaidToJoin', 'firstSessionTrial'] as const) if (input[k] !== undefined) (data as any)[k] = input[k];
     await this.prisma.class.update({ where: { id }, data });
     // Rejim o'zgarsa kelajakdagi (hali boshlanmagan) seanslar ham yangilanadi
-    if (input.stageMode || input.chatMode || input.questionsMode) {
+    if (input.slowModeSeconds !== undefined && (!Number.isInteger(input.slowModeSeconds) || input.slowModeSeconds < 0 || input.slowModeSeconds > 600)) throw new BadRequestException('Slow mode must be 0..600 seconds');
+    if (input.stageMode || input.chatMode || input.questionsMode || input.slowModeSeconds !== undefined || input.handRaiseOn !== undefined) {
       await this.prisma.classSession.updateMany({
         where: { classId: id, status: 'SCHEDULED', startAt: { gt: this.clock.now() } },
-        data: { ...(input.stageMode ? { stageMode: input.stageMode } : {}), ...(input.chatMode ? { chatMode: input.chatMode } : {}), ...(input.questionsMode ? { questionsMode: input.questionsMode } : {}) },
+        data: { ...(input.stageMode ? { stageMode: input.stageMode } : {}), ...(input.chatMode ? { chatMode: input.chatMode } : {}), ...(input.questionsMode ? { questionsMode: input.questionsMode } : {}), ...(input.slowModeSeconds !== undefined ? { slowModeSeconds: input.slowModeSeconds } : {}), ...(input.handRaiseOn !== undefined ? { handRaiseOn: input.handRaiseOn } : {}) },
       });
     }
     await this.audit.log(actor, { action: 'class.update', targetType: 'Class', targetId: id });
@@ -195,7 +198,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
       if (!times.length) continue;
       const hadAny = (await this.prisma.classSession.count({ where: { classId: c.id } })) > 0;
       const res = await this.prisma.classSession.createMany({
-        data: times.map((at, i) => ({ classId: c.id, startAt: at, endAt: new Date(at.getTime() + c.durationMin * 60_000), isTrial: c.firstSessionTrial && !hadAny && i === 0, stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode })),
+        data: times.map((at, i) => ({ classId: c.id, startAt: at, endAt: new Date(at.getTime() + c.durationMin * 60_000), isTrial: c.firstSessionTrial && !hadAny && i === 0, stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode, slowModeSeconds: c.slowModeSeconds, handRaiseOn: c.handRaiseOn })),
         skipDuplicates: true,
       });
       created += res.count;
@@ -308,7 +311,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     return {
       id: c.id, title: c.title, subject: c.subject, description: c.description, capacity: c.capacity, priceMinor: c.priceMinor, priceModel: c.priceModel,
       weekdays: c.weekdays, startMinute: c.startMinute, durationMin: c.durationMin, timezone: c.timezone, startDate: c.startDate, endDate: c.endDate, oneOffStartAt: c.oneOffStartAt,
-      stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode, allowDownload: c.allowDownload, requirePaidToJoin: c.requirePaidToJoin, firstSessionTrial: c.firstSessionTrial, status: c.status,
+      stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode, slowModeSeconds: c.slowModeSeconds, handRaiseOn: c.handRaiseOn, allowDownload: c.allowDownload, requirePaidToJoin: c.requirePaidToJoin, firstSessionTrial: c.firstSessionTrial, status: c.status,
     };
   }
 

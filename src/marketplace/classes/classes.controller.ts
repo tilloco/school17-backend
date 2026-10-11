@@ -36,6 +36,8 @@ class UpdateClassDto {
   @IsOptional() @IsIn(['LISTEN_ONLY', 'HAND_RAISE', 'OPEN_STAGE']) stageMode?: 'LISTEN_ONLY' | 'HAND_RAISE' | 'OPEN_STAGE';
   @IsOptional() @IsIn(['OPEN', 'QUESTIONS_ONLY', 'OFF']) chatMode?: 'OPEN' | 'QUESTIONS_ONLY' | 'OFF';
   @IsOptional() @IsIn(['OPEN', 'OFF']) questionsMode?: 'OPEN' | 'OFF';
+  @IsOptional() @IsInt() @Min(0) @Max(600) slowModeSeconds?: number;
+  @IsOptional() @IsBoolean() handRaiseOn?: boolean;
   @IsOptional() @IsBoolean() allowDownload?: boolean;
   @IsOptional() @IsBoolean() requirePaidToJoin?: boolean;
   @IsOptional() @IsBoolean() firstSessionTrial?: boolean;

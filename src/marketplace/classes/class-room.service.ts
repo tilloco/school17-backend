@@ -155,7 +155,7 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
     return {
       id: s.id, classId: s.classId, role: teacher ? 'teacher' : 'pupil', status: s.status, startAt: s.startAt, endAt: s.endAt,
       lobbyOpensAt: new Date(s.startAt.getTime() - cfg.classLobbyMinutes * 60_000),
-      stageMode: s.stageMode, chatMode: s.chatMode, questionsMode: s.questionsMode, locked: s.locked, spotlightPupilId: s.spotlightPupilId,
+      stageMode: s.stageMode, chatMode: s.chatMode, questionsMode: s.questionsMode, slowModeSeconds: s.slowModeSeconds, handRaiseOn: s.handRaiseOn, locked: s.locked, spotlightPupilId: s.spotlightPupilId,
       teacherReconnecting: s.status === 'LIVE' && !!s.teacherAbsentSince, teacherNoShow: s.teacherNoShow, endReason: s.endReason,
       stageCount, stageMax: cfg.classMaxStagePupils,
       me: teacher ? null : { handRaised: !!me?.handRaisedAt, stage: me?.stage ?? 'NONE', removed: !!me?.removedAt },
@@ -173,7 +173,7 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
 
   async hand(actor: Actor, sessionId: string, raised: boolean) {
     const { s, p } = await this.liveParticipant(actor, sessionId);
-    if (s.stageMode !== 'HAND_RAISE') throw new ConflictException({ message: 'Raising hands is off in this mode', code: 'HAND_RAISE_OFF' });
+    if (s.stageMode !== 'HAND_RAISE' || !s.handRaiseOn) throw new ConflictException({ message: 'Raising hands is off', code: 'HAND_RAISE_OFF' });
     if (raised && p?.stage && p.stage !== 'NONE') throw new ConflictException({ message: 'You are already on stage', code: 'ALREADY_ON_STAGE' });
     await this.prisma.classParticipant.upsert({
       where: { sessionId_pupilId: { sessionId, pupilId: actor.id } },

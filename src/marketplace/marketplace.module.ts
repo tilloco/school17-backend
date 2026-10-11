@@ -27,6 +27,8 @@ import { ClassesService } from './classes/classes.service';
 import { ClassesController } from './classes/classes.controller';
 import { ClassRoomService } from './classes/class-room.service';
 import { ClassRoomController } from './classes/class-room.controller';
+import { ClassChatService } from './classes/class-chat.service';
+import { ClassChatController } from './classes/class-chat.controller';
 import { DirectPaymentService } from './direct-payment/direct-payment.service';
 import { DirectPaymentController, MyDirectPaymentsController, TeacherMoneyController } from './direct-payment/direct-payment.controller';
 import { MessagingService } from './messaging/messaging.service';
@@ -56,10 +58,11 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     JwtModule.registerAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (c: ConfigService) => ({ secret: c.get<string>('JWT_SECRET') }) }),
   ],
   // Tartib muhim: 'teachers/me' controller'i 'teachers/:id' dan oldin turishi kerak
-  controllers: [ClassesController, ClassRoomController, DirectPaymentController, TeacherMoneyController, MyDirectPaymentsController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
+  controllers: [ClassesController, ClassRoomController, ClassChatController, DirectPaymentController, TeacherMoneyController, MyDirectPaymentsController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
   providers: [
     ClassesService,
     ClassRoomService,
+    ClassChatService,
     DirectPaymentService,
     PaymentInfoService,
     NotificationDispatcher, { provide: PUSH_SENDER, useFactory: () => createPushSender() },

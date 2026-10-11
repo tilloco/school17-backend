@@ -1165,6 +1165,8 @@ model Class {
   stageMode         StageMode          @default(HAND_RAISE)
   chatMode          ClassChatMode      @default(OPEN)
   questionsMode     ClassQuestionsMode @default(OPEN)
+  slowModeSeconds   Int                @default(0)
+  handRaiseOn       Boolean            @default(true)
   allowDownload     Boolean            @default(true)
   requirePaidToJoin Boolean            @default(false)
   firstSessionTrial Boolean            @default(false)
@@ -1191,6 +1193,8 @@ model ClassSession {
   stageMode     StageMode
   chatMode      ClassChatMode
   questionsMode ClassQuestionsMode
+  slowModeSeconds Int              @default(0)
+  handRaiseOn   Boolean            @default(true)
   cancelledAt   DateTime?
   locked        Boolean            @default(false)
   spotlightPupilId String?
@@ -1200,6 +1204,8 @@ model ClassSession {
   teacherNoShow Boolean            @default(false)
   endReason     String?
   participants  ClassParticipant[]
+  messages      ClassMessage[]
+  questions     ClassQuestion[]
   attendance    ClassAttendance[]
   createdAt     DateTime           @default(now())
 
@@ -1273,4 +1279,63 @@ model ClassAttendance {
 model ClassRoomEvent {
   eventKey String   @id
   at       DateTime
+}
+
+enum ClassQuestionStatus {
+  OPEN
+  ANSWERED
+  LATER
+  HIDDEN
+}
+
+model ClassMessage {
+  id          String       @id @default(uuid())
+  seq         Int          @unique @default(autoincrement()) // o'sib boruvchi: uzilgandan keyin "shundan keyin" bilan davom etiladi
+  sessionId   String
+  session     ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  authorId    String
+  body        String
+  createdAt   DateTime
+  deletedAt   DateTime?
+  deletedById String?
+
+  @@index([sessionId, seq])
+  @@index([authorId, createdAt])
+}
+
+model ClassQuestion {
+  id          String              @id @default(uuid())
+  seq         Int                 @unique @default(autoincrement())
+  sessionId   String
+  session     ClassSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  authorId    String
+  text        String
+  anonymous   Boolean             @default(false) // sinfdoshlardan yashirish; o'qituvchi baribir ko'radi
+  status      ClassQuestionStatus @default(OPEN)
+  pinned      Boolean             @default(false)
+  upvotes     Int                 @default(0)
+  replyText   String?
+  repliedAt   DateTime?
+  createdAt   DateTime
+  votes       ClassQuestionVote[]
+
+  @@index([sessionId, seq])
+  @@index([authorId, createdAt])
+}
+
+model ClassQuestionVote {
+  questionId String
+  question   ClassQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  voterId    String
+
+  @@id([questionId, voterId])
+}
+
+model ClassMute {
+  id        String   @id @default(uuid())
+  sessionId String
+  pupilId   String
+  until     DateTime
+
+  @@unique([sessionId, pupilId])
 }
