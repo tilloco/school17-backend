@@ -18,7 +18,7 @@ export function marketConfig() {
     lateCancelRefundBps: int('BOOKING_LATE_CANCEL_REFUND_BPS', 0), // 10000 = 100%
     // Qo'ng'iroq oynasi
     joinOpensMinutesBefore: int('CALL_JOIN_OPENS_MINUTES_BEFORE', 5),
-    joinClosesMinutesAfterStart: int('CALL_JOIN_CLOSES_MINUTES_AFTER_START', 15),
+    joinClosesMinutesAfterEnd: int('CALL_JOIN_CLOSES_MINUTES_AFTER_END', 5),
     callTokenTtlSeconds: int('CALL_TOKEN_TTL_SECONDS', 600),
     noShowGraceMinutes: int('CALL_NOSHOW_GRACE_MINUTES', 10),
     // Komissiya (bazis punkt: 1500 = 15%)

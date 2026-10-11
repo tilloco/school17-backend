@@ -76,6 +76,9 @@ model User {
   guardianLinksAsStudent  GuardianLink[] @relation("StudentSide")
   teacherProfile      TeacherProfile? @relation("TeacherProfileUser")
   storedFiles         StoredFile[]   @relation("FileOwner")
+  bookingsAsStudent   Booking[]      @relation("BookingStudent")
+  bookingsMade        Booking[]      @relation("BookingBookedBy")
+  notifications       Notification[] @relation("UserNotifications")
   dailyStudyMinutes   Int?
   selfLevel           String?
   onboardingCompleted Boolean @default(false)
@@ -553,6 +556,7 @@ model TeacherProfile {
   availability AvailabilityRule[]
   timeOff      TeacherTimeOff[]
   credentials  TeacherCredential[]
+  bookings     Booking[]          @relation("TeacherBookings")
 
   @@index([verificationStatus])
   @@index([priceMinor])
@@ -594,4 +598,76 @@ model TeacherCredential {
   createdAt    DateTime         @default(now())
 
   @@index([teacherId])
+}
+
+// ---------------- Marketplace: bron (S3) ----------------
+
+enum BookingStatus {
+  REQUESTED
+  CONFIRMED
+  DECLINED
+  EXPIRED
+  CANCELLED
+  COMPLETED
+  NO_SHOW_STUDENT
+  NO_SHOW_TEACHER
+  FAILED
+}
+
+model Booking {
+  id               String        @id @default(uuid())
+  teacherId        String // TeacherProfile.id
+  teacher          TeacherProfile @relation("TeacherBookings", fields: [teacherId], references: [id], onDelete: Restrict)
+  studentId        String // dars oluvchi (o'quvchi)
+  student          User          @relation("BookingStudent", fields: [studentId], references: [id], onDelete: Restrict)
+  bookedById       String // bronni yaratgan: o'quvchining o'zi yoki vasiy
+  bookedBy         User          @relation("BookingBookedBy", fields: [bookedById], references: [id], onDelete: Restrict)
+  startAt          DateTime
+  endAt            DateTime
+  durationMin      Int
+  priceMinor       Int
+  currency         String        @default("UZS")
+  status           BookingStatus @default(REQUESTED)
+  requestExpiresAt DateTime?
+  decidedAt        DateTime?
+  cancelledAt      DateTime?
+  cancelledByUserId String?
+  cancelledByRole  String? // STUDENT | GUARDIAN | TEACHER | SYSTEM
+  cancelReason     String?
+  lateCancel       Boolean       @default(false)
+  proposedStartAt  DateTime?
+  proposedById     String?
+  noShowMarkedAt   DateTime?
+  actualDurationSec Int?
+  completedAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([teacherId, startAt])
+  @@index([studentId, startAt])
+  @@index([bookedById])
+  @@index([status, startAt])
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+}
+
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String
+  user      User                @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  type      String // masalan: booking.requested, booking.reminder
+  data      Json?
+  dueAt     DateTime            @default(now())
+  sentAt    DateTime?
+  readAt    DateTime?
+  dedupeKey String?
+  createdAt DateTime            @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+  @@index([sentAt, dueAt])
 }
