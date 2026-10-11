@@ -54,6 +54,24 @@ export class BlocksService {
     return { id: b.id, name: target.name };
   }
 
+  /** Suhbat ishtirokchisi (o'qituvchi, o'quvchi yoki o'quvchining vasiysi) boshqa tomonni bloklaydi; vasiy o'qituvchini bloklaydi. */
+  async blockFromThread(actor: Actor, threadId: string) {
+    const t = await this.prisma.chatThread.findUnique({ where: { id: threadId } });
+    if (!t) throw new NotFoundException('Not found');
+    let target: string | null = null;
+    if (t.teacherUserId === actor.id) target = t.studentUserId;
+    else if (t.studentUserId === actor.id) target = t.teacherUserId;
+    else if (await this.guardians.isActiveGuardianOf(actor.id, t.studentUserId)) target = t.teacherUserId;
+    if (!target) throw new NotFoundException('Not found');
+    return this.blockUser(actor, target, 'thread');
+  }
+
+  async blockTeacher(actor: Actor, profileId: string) {
+    const p = await this.prisma.teacherProfile.findUnique({ where: { id: profileId }, select: { userId: true } });
+    if (!p) throw new NotFoundException('Not found');
+    return this.blockUser(actor, p.userId, 'profile');
+  }
+
   async unblock(actor: Actor, blockId: string) {
     const r = await this.prisma.userBlock.deleteMany({ where: { id: blockId, blockerId: actor.id } });
     if (r.count === 0) throw new NotFoundException('Not found');
