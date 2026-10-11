@@ -24,6 +24,11 @@ export function marketConfig() {
     minLessonSeconds: int('CALL_MIN_LESSON_SECONDS', 300), // shundan kam birga bo'lish = dars o'tmagan
     presentMinSeconds: int('CALL_PRESENT_MIN_SECONDS', 60), // shuncha turgan tomon "keldi" hisoblanadi
     presenceStaleSeconds: int('CALL_PRESENCE_STALE_SECONDS', 45),
+    // Sinflar (R1)
+    classMaxPupils: int('CLASS_MAX_PUPILS', 30), // bir sinfdagi o'quvchilar soni chegarasi (o'qituvchi capacity'ni 1..shu oraliqda tanlaydi)
+    classMaxStagePupils: int('CLASS_MAX_STAGE_PUPILS', 10), // bir vaqtda sahnadagi o'quvchilar (R2)
+    classJoinAttemptsPerHour: int('CLASS_JOIN_ATTEMPTS_PER_HOUR', 10), // kod/havola bilan qo'shilish urinishlari, bir foydalanuvchiga
+    classHorizonWeeks: int('CLASS_SESSION_HORIZON_WEEKS', 4), // seanslar necha hafta oldindan yaratiladi
     // Fayllar
     fileMaxImageBytes: int('FILE_MAX_IMAGE_BYTES', 10 * 1024 * 1024),
     fileMaxProofBytes: int('FILE_MAX_PROOF_BYTES', 5 * 1024 * 1024),

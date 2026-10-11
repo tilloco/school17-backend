@@ -66,56 +66,58 @@ enum AuditActorType {
 }
 
 model User {
-  role                Role          @default(STUDENT)
-  dateOfBirth         DateTime?
-  locale              String        @default("uz")
-  timezone            String        @default("Asia/Tashkent")
-  status              AccountStatus @default(ACTIVE)
-  deletedAt           DateTime?
-  guardianLinksAsGuardian GuardianLink[] @relation("GuardianSide")
-  guardianLinksAsStudent  GuardianLink[] @relation("StudentSide")
-  teacherProfile      TeacherProfile? @relation("TeacherProfileUser")
-  storedFiles         StoredFile[]   @relation("FileOwner")
-  bookingsAsStudent   Booking[]      @relation("BookingStudent")
-  bookingsMade        Booking[]      @relation("BookingBookedBy")
-  notifications       Notification[] @relation("UserNotifications")
-  threadsAsTeacher    ChatThread[]   @relation("ThreadTeacher")
-  threadsAsStudent    ChatThread[]   @relation("ThreadStudent")
-  chatMessagesSent    ChatMessage[]  @relation("MessageSender")
-  reviewsWritten      Review[]       @relation("ReviewAuthor")
-  reportsMade         Report[]       @relation("ReportReporter")
-  blocksMade          UserBlock[]    @relation("BlockerSide")
-  blockedBy           UserBlock[]    @relation("BlockedSide")
-  linkCodes           GuardianLinkCode[] @relation("LinkCodeStudent")
-  consents            Consent[]      @relation("UserConsents")
-  pushTokens          PushToken[]    @relation("UserPushTokens")
-  dailyStudyMinutes   Int?
-  selfLevel           String?
-  onboardingCompleted Boolean @default(false)
-  onboarding          OnboardingSession?
-  id                  String    @id @default(uuid())
-  email               String    @unique
-  name                String?
-  avatarUrl           String?
-  examDate            DateTime?
-  isPremium           Boolean   @default(false)
-  premiumExpiresAt    DateTime?
-  referralCode        String    @unique
-  referredByCode      String?
-  walletBalance       Int       @default(0) // so'mda, butun son
-  createdAt           DateTime  @default(now())
+  role                    Role               @default(STUDENT)
+  dateOfBirth             DateTime?
+  locale                  String             @default("uz")
+  timezone                String             @default("Asia/Tashkent")
+  status                  AccountStatus      @default(ACTIVE)
+  deletedAt               DateTime?
+  guardianLinksAsGuardian GuardianLink[]     @relation("GuardianSide")
+  guardianLinksAsStudent  GuardianLink[]     @relation("StudentSide")
+  teacherProfile          TeacherProfile?    @relation("TeacherProfileUser")
+  storedFiles             StoredFile[]       @relation("FileOwner")
+  bookingsAsStudent       Booking[]          @relation("BookingStudent")
+  bookingsMade            Booking[]          @relation("BookingBookedBy")
+  classEnrollments        ClassEnrollment[]  @relation("ClassPupil")
+  classEnrolledBy         ClassEnrollment[]  @relation("ClassEnrolledBy")
+  notifications           Notification[]     @relation("UserNotifications")
+  threadsAsTeacher        ChatThread[]       @relation("ThreadTeacher")
+  threadsAsStudent        ChatThread[]       @relation("ThreadStudent")
+  chatMessagesSent        ChatMessage[]      @relation("MessageSender")
+  reviewsWritten          Review[]           @relation("ReviewAuthor")
+  reportsMade             Report[]           @relation("ReportReporter")
+  blocksMade              UserBlock[]        @relation("BlockerSide")
+  blockedBy               UserBlock[]        @relation("BlockedSide")
+  linkCodes               GuardianLinkCode[] @relation("LinkCodeStudent")
+  consents                Consent[]          @relation("UserConsents")
+  pushTokens              PushToken[]        @relation("UserPushTokens")
+  dailyStudyMinutes       Int?
+  selfLevel               String?
+  onboardingCompleted     Boolean            @default(false)
+  onboarding              OnboardingSession?
+  id                      String             @id @default(uuid())
+  email                   String             @unique
+  name                    String?
+  avatarUrl               String?
+  examDate                DateTime?
+  isPremium               Boolean            @default(false)
+  premiumExpiresAt        DateTime?
+  referralCode            String             @unique
+  referredByCode          String?
+  walletBalance           Int                @default(0) // so'mda, butun son
+  createdAt               DateTime           @default(now())
 
-  progress            UserProgress[]
-  answers             UserAnswer[]
-  streak              Streak?
-  payments            Payment[]
-  examSessions        ExamSession[]
-  referralsMade       Referral[] @relation("Referrer")
-  referralReceived    Referral?  @relation("ReferredUser")
-  withdrawals         Withdrawal[]
-  premiumGrants       PremiumGrant[]
-  aiRecommendation    AiRecommendation?
-    conversationParticipants ConversationParticipant[]
+  progress                 UserProgress[]
+  answers                  UserAnswer[]
+  streak                   Streak?
+  payments                 Payment[]
+  examSessions             ExamSession[]
+  referralsMade            Referral[]                @relation("Referrer")
+  referralReceived         Referral?                 @relation("ReferredUser")
+  withdrawals              Withdrawal[]
+  premiumGrants            PremiumGrant[]
+  aiRecommendation         AiRecommendation?
+  conversationParticipants ConversationParticipant[]
   messagesSent             Message[]
 }
 
@@ -144,33 +146,33 @@ model Lesson {
   title        String
   content      String         @db.Text // 5-10 daqiqalik matn
   order        Int
-  articleLabel String?        // masalan "12-18-moddalar" - dashboardda "bugun nima o'qidingiz" uchun
+  articleLabel String? // masalan "12-18-moddalar" - dashboardda "bugun nima o'qidingiz" uchun
   questions    Question[]
   progress     UserProgress[]
   createdAt    DateTime       @default(now())
 }
 
 model Question {
-  id            String       @id @default(uuid())
-  lessonId      String
-  lesson        Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  text          String       @db.Text
-  options       String[]     // 4 ta variant (faqat CLOSED turi uchun)
-  correctIndex  Int          // faqat CLOSED turi uchun
-  explanation   String       @db.Text
-  answers       UserAnswer[]
-  createdAt     DateTime     @default(now())
+  id           String       @id @default(uuid())
+  lessonId     String
+  lesson       Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  text         String       @db.Text
+  options      String[] // 4 ta variant (faqat CLOSED turi uchun)
+  correctIndex Int // faqat CLOSED turi uchun
+  explanation  String       @db.Text
+  answers      UserAnswer[]
+  createdAt    DateTime     @default(now())
 
   // Milliy sertifikat mock imtihoni uchun qo'shimcha maydonlar
-  questionType  QuestionType @default(CLOSED)
-  difficulty    Int          @default(1) // 1 yoki 2 - yopiq savol ballini aniqlaydi (1.3 yoki 2.2)
-      concepts      String[]     @default([]) // savol mavzulari, masalan: ["mulk_huquqi", "shartnoma_huquqi"]
-  partAPrompt   String?      @db.Text // faqat OPEN turi uchun
-  partAAnswer   String?      @db.Text // namunaviy javob (AI shu bilan solishtiradi)
-  partBPrompt   String?      @db.Text
-  partBAnswer   String?      @db.Text
+  questionType QuestionType @default(CLOSED)
+  difficulty   Int          @default(1) // 1 yoki 2 - yopiq savol ballini aniqlaydi (1.3 yoki 2.2)
+  concepts     String[]     @default([]) // savol mavzulari, masalan: ["mulk_huquqi", "shartnoma_huquqi"]
+  partAPrompt  String?      @db.Text // faqat OPEN turi uchun
+  partAAnswer  String?      @db.Text // namunaviy javob (AI shu bilan solishtiradi)
+  partBPrompt  String?      @db.Text
+  partBAnswer  String?      @db.Text
 
-  examAnswers   ExamAnswer[]
+  examAnswers ExamAnswer[]
 }
 
 model UserProgress {
@@ -186,38 +188,38 @@ model UserProgress {
 }
 
 model UserAnswer {
-  id           String   @id @default(uuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  questionId   String
-  question     Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  chosenIndex  Int
-  isCorrect    Boolean
-  answeredAt   DateTime @default(now())
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  chosenIndex Int
+  isCorrect   Boolean
+  answeredAt  DateTime @default(now())
 }
 
 model Streak {
-  id                String    @id @default(uuid())
-  userId            String    @unique
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  currentCount      Int       @default(0)
-  longestCount      Int       @default(0)   // eng yaxshi natija - doim ko'rsatiladi, hatto streak uzilsa ham
-  lastActiveDate    DateTime?               // kunning boshiga normallashtirilgan (UTC 00:00)
-  freezesAvailable  Int       @default(0)   // bir kun o'tkazib yuborilsa streak'ni saqlab qoladi
-  freezesUsedTotal  Int       @default(0)
-  lastMilestoneHit  Int       @default(0)   // oxirgi mukofot berilgan bosqich - qayta bermaslik uchun
-  updatedAt         DateTime  @updatedAt
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentCount     Int       @default(0)
+  longestCount     Int       @default(0) // eng yaxshi natija - doim ko'rsatiladi, hatto streak uzilsa ham
+  lastActiveDate   DateTime? // kunning boshiga normallashtirilgan (UTC 00:00)
+  freezesAvailable Int       @default(0) // bir kun o'tkazib yuborilsa streak'ni saqlab qoladi
+  freezesUsedTotal Int       @default(0)
+  lastMilestoneHit Int       @default(0) // oxirgi mukofot berilgan bosqich - qayta bermaslik uchun
+  updatedAt        DateTime  @updatedAt
 }
 
 model Referral {
-  id               String         @id @default(uuid())
-  referrerId       String
-  referrer         User           @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
-  referredUserId   String         @unique
-  referredUser     User           @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
-  rewardAmount     Int            @default(0)
-  status           ReferralStatus @default(PENDING)
-  createdAt        DateTime       @default(now())
+  id             String         @id @default(uuid())
+  referrerId     String
+  referrer       User           @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUserId String         @unique
+  referredUser   User           @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+  rewardAmount   Int            @default(0)
+  status         ReferralStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
 
   @@index([referrerId])
 }
@@ -246,7 +248,7 @@ model PremiumGrant {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   months    Int
-  source    String   // 'PAYMENT' | 'REFERRAL_BONUS' | 'ADMIN_GRANT'
+  source    String // 'PAYMENT' | 'REFERRAL_BONUS' | 'ADMIN_GRANT'
   createdAt DateTime @default(now())
 
   @@index([userId])
@@ -256,13 +258,13 @@ model Payment {
   id        String          @id @default(uuid())
   userId    String
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  amount    Int             // so'mda (Payme ichkarida tiyinga o'giradi, chunki ular shu birlikda ishlaydi)
+  amount    Int // so'mda (Payme ichkarida tiyinga o'giradi, chunki ular shu birlikda ishlaydi)
   months    Int             @default(1) // sotib olinayotgan premium necha oylik
   provider  PaymentProvider
   status    PaymentStatus   @default(PENDING)
   // Click uchun merchant_prepare_id/merchant_trans_id sifatida, Payme javoblarida "transaction"
   // maydoni sifatida ishlatiladigan qisqa, ketma-ket raqam (UUID emas - provayderlar buni kutadi)
-  seq       Int             @default(autoincrement()) @unique
+  seq       Int             @unique @default(autoincrement())
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
@@ -271,7 +273,7 @@ model Payment {
 }
 
 enum ClickTransactionState {
-  CREATED   // Prepare bosqichi o'tdi, Complete kutilmoqda
+  CREATED // Prepare bosqichi o'tdi, Complete kutilmoqda
   CONFIRMED // Complete muvaffaqiyatli
   CANCELLED
 }
@@ -294,9 +296,9 @@ model ClickTransaction {
 }
 
 enum PaymeTransactionState {
-  CREATED                  // 1 - yaratilgan, hali to'lanmagan
-  COMPLETED                // 2 - muvaffaqiyatli to'langan
-  CANCELLED                // -1 - to'lanishdan oldin bekor qilingan
+  CREATED // 1 - yaratilgan, hali to'lanmagan
+  COMPLETED // 2 - muvaffaqiyatli to'langan
+  CANCELLED // -1 - to'lanishdan oldin bekor qilingan
   CANCELLED_AFTER_COMPLETE // -2 - to'langandan keyin bekor qilingan (pul qaytarilgan)
 }
 
@@ -309,7 +311,7 @@ model PaymeTransaction {
   paymeId     String                @unique
   paymentId   String
   payment     Payment               @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  amount      Int                   // tiyinda (Payme shu birlikda yuboradi)
+  amount      Int // tiyinda (Payme shu birlikda yuboradi)
   state       PaymeTransactionState @default(CREATED)
   reason      Int?
   createTime  DateTime              @default(now())
@@ -350,8 +352,8 @@ model OnboardingSession {
   userId    String   @unique
   status    String   @default("in_progress") // in_progress | completed
   history   Json     @default("[]") // [{ question, answer }]
-  profile   Json?    // final structured profile once completed
-  plan      Json?    // final personalized welcome plan once completed
+  profile   Json? // final structured profile once completed
+  plan      Json? // final personalized welcome plan once completed
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -370,14 +372,14 @@ model ExamSession {
   user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   status      ExamSessionStatus @default(IN_PROGRESS)
   startedAt   DateTime          @default(now())
-  expiresAt   DateTime          // startedAt + 150 daqiqa
+  expiresAt   DateTime // startedAt + 150 daqiqa
   submittedAt DateTime?
   totalScore  Float?
   maxScore    Float?
   percentage  Float?
   grade       String?
 
-  answers     ExamAnswer[]
+  answers ExamAnswer[]
 
   @@index([userId])
 }
@@ -390,20 +392,21 @@ model ExamAnswer {
   question      Question    @relation(fields: [questionId], references: [id])
 
   // CLOSED turi uchun
-  chosenIndex   Int?
-  isCorrect     Boolean?
+  chosenIndex Int?
+  isCorrect   Boolean?
 
   // OPEN turi uchun
-  partAText     String?     @db.Text
-  partBText     String?     @db.Text
-  partACorrect  Boolean?
-  partBCorrect  Boolean?
+  partAText    String?  @db.Text
+  partBText    String?  @db.Text
+  partACorrect Boolean?
+  partBCorrect Boolean?
 
-  pointsEarned  Float       @default(0)
-  createdAt     DateTime    @default(now())
+  pointsEarned Float    @default(0)
+  createdAt    DateTime @default(now())
 
   @@index([examSessionId])
 }
+
 enum ConversationType {
   DM
   GROUP
@@ -417,10 +420,10 @@ enum MessageType {
 }
 
 model Conversation {
-  id        String   @id @default(uuid())
+  id        String           @id @default(uuid())
   type      ConversationType @default(DM)
-  name      String?  // faqat GROUP uchun keyinroq
-  createdAt DateTime @default(now())
+  name      String? // faqat GROUP uchun keyinroq
+  createdAt DateTime         @default(now())
 
   participants ConversationParticipant[]
   messages     Message[]
@@ -433,7 +436,7 @@ model ConversationParticipant {
   userId         String
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   joinedAt       DateTime     @default(now())
-  lastReadAt     DateTime?    // "o'qilmagan xabarlar" hisoblash uchun keyinroq
+  lastReadAt     DateTime? // "o'qilmagan xabarlar" hisoblash uchun keyinroq
 
   @@unique([conversationId, userId])
   @@index([userId])
@@ -446,8 +449,8 @@ model Message {
   senderId       String
   sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
   type           MessageType  @default(TEXT)
-  content        String?      @db.Text   // TEXT va emoji shu yerda (emoji = oddiy unicode matn)
-  mediaUrl       String?                 // IMAGE/VIDEO/FILE uchun — keyinroq to'ldiriladi
+  content        String?      @db.Text // TEXT va emoji shu yerda (emoji = oddiy unicode matn)
+  mediaUrl       String? // IMAGE/VIDEO/FILE uchun — keyinroq to'ldiriladi
   mediaFileName  String?
   mediaSizeBytes Int?
   createdAt      DateTime     @default(now())
@@ -530,31 +533,31 @@ enum StoredFileStatus {
 }
 
 model StoredFile {
-  id           String            @id @default(uuid())
-  ownerId      String
-  owner        User              @relation("FileOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  purpose      StoredFilePurpose
-  originalName String
-  mime         String?
-  sizeBytes    Int               @default(0)
-  declaredSize Int               @default(0)
-  storageKey   String            @unique
-  sha256       String?
-  finalMime    String?
-  scanStatus   FileScanStatus    @default(NOT_SCANNED)
-  thumbKey     String?
-  width        Int?
-  height       Int?
-  pageCount    Int?
-  chunkSize    Int               @default(1048576)
-  completedAt  DateTime?
-  deletedAt    DateTime?
-  rejectReason String?
-  status       StoredFileStatus  @default(PENDING_UPLOAD)
-  createdAt    DateTime          @default(now())
-  credentials  TeacherCredential[]
-  messages     ChatMessage[]
-  directPaymentProofs DirectPayment[] @relation("DirectPaymentProof")
+  id                  String              @id @default(uuid())
+  ownerId             String
+  owner               User                @relation("FileOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  purpose             StoredFilePurpose
+  originalName        String
+  mime                String?
+  sizeBytes           Int                 @default(0)
+  declaredSize        Int                 @default(0)
+  storageKey          String              @unique
+  sha256              String?
+  finalMime           String?
+  scanStatus          FileScanStatus      @default(NOT_SCANNED)
+  thumbKey            String?
+  width               Int?
+  height              Int?
+  pageCount           Int?
+  chunkSize           Int                 @default(1048576)
+  completedAt         DateTime?
+  deletedAt           DateTime?
+  rejectReason        String?
+  status              StoredFileStatus    @default(PENDING_UPLOAD)
+  createdAt           DateTime            @default(now())
+  credentials         TeacherCredential[]
+  messages            ChatMessage[]
+  directPaymentProofs DirectPayment[]     @relation("DirectPaymentProof")
 
   @@index([ownerId, createdAt])
 }
@@ -588,8 +591,9 @@ model TeacherProfile {
   availability AvailabilityRule[]
   timeOff      TeacherTimeOff[]
   credentials  TeacherCredential[]
-  bookings     Booking[]          @relation("TeacherBookings")
-  reviews      Review[]           @relation("TeacherReviews")
+  bookings     Booking[]           @relation("TeacherBookings")
+  classes      Class[]             @relation("TeacherClasses")
+  reviews      Review[]            @relation("TeacherReviews")
   paymentInfo  TeacherPaymentInfo?
 
   @@index([verificationStatus])
@@ -619,17 +623,17 @@ model TeacherTimeOff {
 }
 
 model TeacherCredential {
-  id           String           @id @default(uuid())
-  teacherId    String
-  teacher      TeacherProfile   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  kind         CredentialKind
-  title        String
-  fileId       String
-  file         StoredFile       @relation(fields: [fileId], references: [id], onDelete: Restrict)
-  status       CredentialStatus @default(PENDING)
-  reviewedAt   DateTime?
-  reviewNote   String?
-  createdAt    DateTime         @default(now())
+  id         String           @id @default(uuid())
+  teacherId  String
+  teacher    TeacherProfile   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  kind       CredentialKind
+  title      String
+  fileId     String
+  file       StoredFile       @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  status     CredentialStatus @default(PENDING)
+  reviewedAt DateTime?
+  reviewNote String?
+  createdAt  DateTime         @default(now())
 
   @@index([teacherId])
 }
@@ -649,39 +653,39 @@ enum BookingStatus {
 }
 
 model Booking {
-  id               String        @id @default(uuid())
-  teacherId        String // TeacherProfile.id
-  teacher          TeacherProfile @relation("TeacherBookings", fields: [teacherId], references: [id], onDelete: Restrict)
-  studentId        String // dars oluvchi (o'quvchi)
-  student          User          @relation("BookingStudent", fields: [studentId], references: [id], onDelete: Restrict)
-  bookedById       String // bronni yaratgan: o'quvchining o'zi yoki vasiy
-  bookedBy         User          @relation("BookingBookedBy", fields: [bookedById], references: [id], onDelete: Restrict)
-  startAt          DateTime
-  endAt            DateTime
-  durationMin      Int
-  priceMinor       Int
-  currency         String        @default("UZS")
-  status           BookingStatus @default(REQUESTED)
-  requestExpiresAt DateTime?
-  decidedAt        DateTime?
-  cancelledAt      DateTime?
+  id                String         @id @default(uuid())
+  teacherId         String // TeacherProfile.id
+  teacher           TeacherProfile @relation("TeacherBookings", fields: [teacherId], references: [id], onDelete: Restrict)
+  studentId         String // dars oluvchi (o'quvchi)
+  student           User           @relation("BookingStudent", fields: [studentId], references: [id], onDelete: Restrict)
+  bookedById        String // bronni yaratgan: o'quvchining o'zi yoki vasiy
+  bookedBy          User           @relation("BookingBookedBy", fields: [bookedById], references: [id], onDelete: Restrict)
+  startAt           DateTime
+  endAt             DateTime
+  durationMin       Int
+  priceMinor        Int
+  currency          String         @default("UZS")
+  status            BookingStatus  @default(REQUESTED)
+  requestExpiresAt  DateTime?
+  decidedAt         DateTime?
+  cancelledAt       DateTime?
   cancelledByUserId String?
-  cancelledByRole  String? // STUDENT | GUARDIAN | TEACHER | SYSTEM
-  cancelReason     String?
-  lateCancel       Boolean       @default(false)
-  proposedStartAt  DateTime?
-  proposedById     String?
-  noShowMarkedAt   DateTime?
+  cancelledByRole   String? // STUDENT | GUARDIAN | TEACHER | SYSTEM
+  cancelReason      String?
+  lateCancel        Boolean        @default(false)
+  proposedStartAt   DateTime?
+  proposedById      String?
+  noShowMarkedAt    DateTime?
   actualDurationSec Int?
-  outcomeNote      String?
-  callRooms        CallRoom[]    @relation("BookingCallRooms")
-  review           Review?       @relation("BookingReview")
-  isTrial          Boolean       @default(false)
-  directPayment    DirectPayment? @relation("BookingDirectPayment")
-  payment          LessonPayment? @relation("BookingPayment")
-  completedAt      DateTime?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  outcomeNote       String?
+  callRooms         CallRoom[]     @relation("BookingCallRooms")
+  review            Review?        @relation("BookingReview")
+  isTrial           Boolean        @default(false)
+  directPayment     DirectPayment? @relation("BookingDirectPayment")
+  payment           LessonPayment? @relation("BookingPayment")
+  completedAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   @@index([teacherId, startAt])
   @@index([studentId, startAt])
@@ -696,18 +700,18 @@ enum NotificationChannel {
 }
 
 model Notification {
-  id        String              @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User                @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
   type      String // masalan: booking.requested, booking.reminder
   data      Json?
-  dueAt     DateTime            @default(now())
+  dueAt     DateTime  @default(now())
   sentAt    DateTime?
   readAt    DateTime?
   dedupeKey String?
-  attempts  Int                 @default(0)
+  attempts  Int       @default(0)
   lastError String?
-  createdAt DateTime            @default(now())
+  createdAt DateTime  @default(now())
 
   @@unique([userId, dedupeKey])
   @@index([userId, createdAt])
@@ -723,19 +727,19 @@ enum CallRoomStatus {
 }
 
 model CallRoom {
-  id         String         @id @default(uuid())
-  bookingId  String
-  booking    Booking        @relation("BookingCallRooms", fields: [bookingId], references: [id], onDelete: Cascade)
-  roomName   String         @unique // taxmin qilib bo'lmaydigan (128 bit tasodifiy)
-  provider   String
-  status     CallRoomStatus @default(ACTIVE)
-  teacherKey String // provayderdagi anonim identity (haqiqiy user id oshkor qilinmaydi)
-  studentKey String
+  id                      String         @id @default(uuid())
+  bookingId               String
+  booking                 Booking        @relation("BookingCallRooms", fields: [bookingId], references: [id], onDelete: Cascade)
+  roomName                String         @unique // taxmin qilib bo'lmaydigan (128 bit tasodifiy)
+  provider                String
+  status                  CallRoomStatus @default(ACTIVE)
+  teacherKey              String // provayderdagi anonim identity (haqiqiy user id oshkor qilinmaydi)
+  studentKey              String
   recordingConsentTeacher Boolean?
   recordingConsentStudent Boolean?
-  createdAt  DateTime       @default(now())
-  endedAt    DateTime?
-  revokedAt  DateTime?
+  createdAt               DateTime       @default(now())
+  endedAt                 DateTime?
+  revokedAt               DateTime?
 
   sessions CallSession[]
   tokens   CallTokenIssue[]
@@ -783,45 +787,43 @@ model CallEvent {
   @@index([bookingId, at])
 }
 
-
 // ---------------- Marketplace: xabarlar (S5) ----------------
 
 model ChatThread {
-  id                   String        @id @default(uuid())
-  teacherUserId        String
-  teacher              User          @relation("ThreadTeacher", fields: [teacherUserId], references: [id], onDelete: Cascade)
-  studentUserId        String // o'quvchi (voyaga yetmagan bo'lsa ham o'zi)
-  student              User          @relation("ThreadStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
-  lastSeq              Int           @default(0)
-  lastMessageAt        DateTime?
-  teacherLastReadSeq   Int           @default(0)
-  studentLastReadSeq   Int           @default(0)
-  teacherDeliveredSeq  Int           @default(0)
-  studentDeliveredSeq  Int           @default(0)
-  createdAt            DateTime      @default(now())
-  messages             ChatMessage[]
+  id                  String        @id @default(uuid())
+  teacherUserId       String
+  teacher             User          @relation("ThreadTeacher", fields: [teacherUserId], references: [id], onDelete: Cascade)
+  studentUserId       String // o'quvchi (voyaga yetmagan bo'lsa ham o'zi)
+  student             User          @relation("ThreadStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  lastSeq             Int           @default(0)
+  lastMessageAt       DateTime?
+  teacherLastReadSeq  Int           @default(0)
+  studentLastReadSeq  Int           @default(0)
+  teacherDeliveredSeq Int           @default(0)
+  studentDeliveredSeq Int           @default(0)
+  createdAt           DateTime      @default(now())
+  messages            ChatMessage[]
 
   @@unique([teacherUserId, studentUserId])
   @@index([studentUserId])
 }
 
 model ChatMessage {
-  id        String     @id @default(uuid())
+  id        String      @id @default(uuid())
   threadId  String
-  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  thread    ChatThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
   seq       Int
   senderId  String
-  sender    User       @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-  body      String     @default("") @db.Text
-  fileId    String?    @unique
+  sender    User        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  body      String      @default("") @db.Text
+  fileId    String?     @unique
   file      StoredFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
-  createdAt DateTime   @default(now())
+  createdAt DateTime    @default(now())
   deletedAt DateTime?
 
   @@unique([threadId, seq])
   @@index([senderId, createdAt])
 }
-
 
 // ---------------- Marketplace: sharhlar va shikoyatlar (S7) ----------------
 
@@ -831,21 +833,21 @@ enum ReviewStatus {
 }
 
 model Review {
-  id          String       @id @default(uuid())
-  bookingId   String       @unique
-  booking     Booking      @relation("BookingReview", fields: [bookingId], references: [id], onDelete: Restrict)
-  teacherId   String // TeacherProfile.id
-  teacher     TeacherProfile @relation("TeacherReviews", fields: [teacherId], references: [id], onDelete: Restrict)
-  authorId    String
-  author      User         @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Restrict)
-  rating      Int
-  text        String       @default("") @db.Text
-  status      ReviewStatus @default(VISIBLE)
+  id           String         @id @default(uuid())
+  bookingId    String         @unique
+  booking      Booking        @relation("BookingReview", fields: [bookingId], references: [id], onDelete: Restrict)
+  teacherId    String // TeacherProfile.id
+  teacher      TeacherProfile @relation("TeacherReviews", fields: [teacherId], references: [id], onDelete: Restrict)
+  authorId     String
+  author       User           @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  rating       Int
+  text         String         @default("") @db.Text
+  status       ReviewStatus   @default(VISIBLE)
   hiddenReason String?
-  teacherReply String?     @db.Text
-  repliedAt   DateTime?
-  editedAt    DateTime?
-  createdAt   DateTime     @default(now())
+  teacherReply String?        @db.Text
+  repliedAt    DateTime?
+  editedAt     DateTime?
+  createdAt    DateTime       @default(now())
 
   @@index([teacherId, status, createdAt])
   @@index([authorId])
@@ -875,25 +877,24 @@ enum ReportStatus {
 }
 
 model Report {
-  id               String           @id @default(uuid())
-  reporterId       String
-  reporter         User             @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  targetType       ReportTargetType
-  targetId         String
-  reason           ReportReason
-  note             String           @default("") @db.Text
-  status           ReportStatus     @default(OPEN)
-  snapshot         Json? // shikoyat paytidagi kontent nusxasi (keyin o'chirilsa ham admin ko'ra oladi)
-  resolutionNote   String?
+  id                String           @id @default(uuid())
+  reporterId        String
+  reporter          User             @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType        ReportTargetType
+  targetId          String
+  reason            ReportReason
+  note              String           @default("") @db.Text
+  status            ReportStatus     @default(OPEN)
+  snapshot          Json? // shikoyat paytidagi kontent nusxasi (keyin o'chirilsa ham admin ko'ra oladi)
+  resolutionNote    String?
   resolvedByAdminId String?
-  resolvedAt       DateTime?
-  createdAt        DateTime         @default(now())
+  resolvedAt        DateTime?
+  createdAt         DateTime         @default(now())
 
   @@unique([reporterId, targetType, targetId])
   @@index([status, createdAt])
   @@index([targetType, targetId])
 }
-
 
 // ---------------- Marketplace: to'lovlar va daftar (S8) ----------------
 // Pul HAR DOIM butun son, eng kichik birlikda (tiyin; 1 so'm = 100 tiyin). Haqiqiy to'lov provayderi YO'Q: MockPaymentProvider.
@@ -910,28 +911,28 @@ enum PaymentState {
 }
 
 model LessonPayment {
-  id             String       @id @default(uuid())
-  bookingId      String       @unique
-  booking        Booking      @relation("BookingPayment", fields: [bookingId], references: [id], onDelete: Restrict)
-  payerId        String
-  teacherUserId  String
-  amountMinor    Int
-  currency       String       @default("UZS")
-  commissionBps  Int
-  state          PaymentState @default(PENDING)
-  provider       String
-  providerRef    String?
-  idempotencyKey String       @unique
-  failureCode    String?
-  earnedMinor    Int          @default(0) // o'qituvchiga hisoblangan (komissiyadan oldin)
-  commissionMinor Int         @default(0)
-  refundedMinor  Int          @default(0)
-  releaseAt      DateTime?
-  disputeReason  String?
-  disputedAt     DateTime?
-  resolutionNote String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id              String       @id @default(uuid())
+  bookingId       String       @unique
+  booking         Booking      @relation("BookingPayment", fields: [bookingId], references: [id], onDelete: Restrict)
+  payerId         String
+  teacherUserId   String
+  amountMinor     Int
+  currency        String       @default("UZS")
+  commissionBps   Int
+  state           PaymentState @default(PENDING)
+  provider        String
+  providerRef     String?
+  idempotencyKey  String       @unique
+  failureCode     String?
+  earnedMinor     Int          @default(0) // o'qituvchiga hisoblangan (komissiyadan oldin)
+  commissionMinor Int          @default(0)
+  refundedMinor   Int          @default(0)
+  releaseAt       DateTime?
+  disputeReason   String?
+  disputedAt      DateTime?
+  resolutionNote  String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   @@index([state, releaseAt])
   @@index([teacherUserId, createdAt])
@@ -974,22 +975,21 @@ enum PayoutStatus {
 }
 
 model PayoutRequest {
-  id              String       @id @default(uuid())
-  teacherUserId   String
-  amountMinor     BigInt
-  destination     String // masalan "Humo ****1234" — to'liq karta raqami SAQLANMAYDI
-  status          PayoutStatus @default(REQUESTED)
-  idempotencyKey  String       @unique
-  providerRef     String?
-  rejectReason    String?
+  id                String       @id @default(uuid())
+  teacherUserId     String
+  amountMinor       BigInt
+  destination       String // masalan "Humo ****1234" — to'liq karta raqami SAQLANMAYDI
+  status            PayoutStatus @default(REQUESTED)
+  idempotencyKey    String       @unique
+  providerRef       String?
+  rejectReason      String?
   reviewedByAdminId String?
-  requestedAt     DateTime     @default(now())
-  paidAt          DateTime?
+  requestedAt       DateTime     @default(now())
+  paidAt            DateTime?
 
   @@index([teacherUserId, requestedAt])
   @@index([status, requestedAt])
 }
-
 
 // ---------------- Marketplace: xavfsizlik, roziliklar (S9/S10) ----------------
 
@@ -1027,33 +1027,31 @@ enum ConsentKind {
 }
 
 model Consent {
-  id         String      @id @default(uuid())
-  userId     String
-  user       User        @relation("UserConsents", fields: [userId], references: [id], onDelete: Cascade)
-  kind       ConsentKind
-  version    String
-  locale     String      @default("uz")
-  acceptedAt DateTime    @default(now())
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation("UserConsents", fields: [userId], references: [id], onDelete: Cascade)
+  kind        ConsentKind
+  version     String
+  locale      String      @default("uz")
+  acceptedAt  DateTime    @default(now())
   withdrawnAt DateTime?
 
   @@unique([userId, kind, version])
   @@index([userId, kind])
 }
 
-
 // Push tokenlari (Expo Push). Token — qurilma identifikatori: shaxsiy ma'lumot hisoblanadi, akkaunt o'chirilganda o'chiriladi.
 model PushToken {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation("UserPushTokens", fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
-  platform  String
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation("UserPushTokens", fields: [userId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  platform   String
+  createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
 
   @@index([userId])
 }
-
 
 // ---------------- A2: o'qituvchi karta ma'lumotlari (to'g'ridan-to'g'ri to'lov uchun) ----------------
 // To'liq karta raqami faqat AES-256-GCM bilan shifrlangan holda saqlanadi (APP_DATA_KEY). CVV/muddat/SMS HECH QACHON qabul qilinmaydi.
@@ -1067,7 +1065,6 @@ model TeacherPaymentInfo {
   updatedAt     DateTime       @updatedAt
   createdAt     DateTime       @default(now())
 }
-
 
 // ---------------- A3: to'g'ridan-to'g'ri to'lovni kuzatish (platforma pul ushlamaydi) ----------------
 enum PaymentTiming {
@@ -1085,11 +1082,11 @@ enum DirectPaymentStatus {
 
 // Faqat belgi: "o'quvchi to'lagan deb belgiladi" / "o'qituvchi oldim deb tasdiqladi". Ilova to'lovni tekshirmaydi, ushlamaydi, qaytarmaydi.
 model DirectPayment {
-  id                 String              @id @default(uuid())
-  bookingId          String              @unique
-  booking            Booking             @relation("BookingDirectPayment", fields: [bookingId], references: [id], onDelete: Restrict)
+  id                 String               @id @default(uuid())
+  bookingId          String               @unique
+  booking            Booking              @relation("BookingDirectPayment", fields: [bookingId], references: [id], onDelete: Restrict)
   amountMinor        BigInt // dars narxi (qabul qilingan paytdagi nusxa)
-  status             DirectPaymentStatus @default(UNPAID)
+  status             DirectPaymentStatus  @default(UNPAID)
   pupilMarkedAt      DateTime?
   teacherConfirmedAt DateTime?
   notReceivedAt      DateTime?
@@ -1097,10 +1094,130 @@ model DirectPayment {
   waivedFrom         DirectPaymentStatus?
   waivedReason       String?
   proofFileId        String?
-  proofFile          StoredFile?         @relation("DirectPaymentProof", fields: [proofFileId], references: [id], onDelete: SetNull)
+  proofFile          StoredFile?          @relation("DirectPaymentProof", fields: [proofFileId], references: [id], onDelete: SetNull)
   lastRemindedAt     DateTime?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
 
   @@index([status, createdAt])
+}
+
+// ===== R1: sinflar (1 o'qituvchi + 30 tagacha o'quvchi) =====
+enum ClassStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum ClassPriceModel {
+  PER_SESSION
+  MONTHLY
+}
+
+enum StageMode {
+  LISTEN_ONLY
+  HAND_RAISE
+  OPEN_STAGE
+}
+
+enum ClassChatMode {
+  OPEN
+  QUESTIONS_ONLY
+  OFF
+}
+
+enum ClassQuestionsMode {
+  OPEN
+  OFF
+}
+
+enum ClassSessionStatus {
+  SCHEDULED
+  LOBBY
+  LIVE
+  ENDED
+  CANCELLED
+}
+
+enum ClassEnrollmentStatus {
+  ACTIVE
+  REMOVED
+  LEFT
+}
+
+model Class {
+  id                String             @id @default(uuid())
+  teacherId         String // TeacherProfile.id
+  teacher           TeacherProfile     @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Restrict)
+  title             String
+  subject           String
+  description       String             @default("")
+  capacity          Int
+  enrolledCount     Int                @default(0) // atomik hisoblagich: sig'im tekshiruvi shu orqali
+  priceMinor        Int                @default(0) // faqat ma'lumot uchun; ilova pul yig'maydi
+  priceModel        ClassPriceModel    @default(PER_SESSION)
+  weekdays          Int[] // ISO 1..7, bo'sh bo'lsa bir martalik
+  startMinute       Int                @default(0) // kun boshidan daqiqa (o'qituvchi vaqt zonasida)
+  durationMin       Int                @default(60)
+  timezone          String             @default("Asia/Tashkent")
+  startDate         DateTime? // takrorlanish boshlanishi (shu kun yoki keyin)
+  endDate           DateTime? // takrorlanish tugashi (shu kungacha)
+  oneOffStartAt     DateTime?
+  stageMode         StageMode          @default(HAND_RAISE)
+  chatMode          ClassChatMode      @default(OPEN)
+  questionsMode     ClassQuestionsMode @default(OPEN)
+  allowDownload     Boolean            @default(true)
+  requirePaidToJoin Boolean            @default(false)
+  firstSessionTrial Boolean            @default(false)
+  status            ClassStatus        @default(ACTIVE)
+  codeHash          String             @unique
+  inviteHash        String             @unique
+  cancelledAt       DateTime?
+  sessions          ClassSession[]
+  enrollments       ClassEnrollment[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([teacherId, status])
+}
+
+model ClassSession {
+  id            String             @id @default(uuid())
+  classId       String
+  class         Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
+  startAt       DateTime
+  endAt         DateTime
+  status        ClassSessionStatus @default(SCHEDULED)
+  isTrial       Boolean            @default(false)
+  stageMode     StageMode
+  chatMode      ClassChatMode
+  questionsMode ClassQuestionsMode
+  cancelledAt   DateTime?
+  createdAt     DateTime           @default(now())
+
+  @@unique([classId, startAt])
+  @@index([startAt, status])
+}
+
+model ClassEnrollment {
+  id           String                @id @default(uuid())
+  classId      String
+  class        Class                 @relation(fields: [classId], references: [id], onDelete: Cascade)
+  pupilId      String
+  pupil        User                  @relation("ClassPupil", fields: [pupilId], references: [id], onDelete: Restrict)
+  enrolledById String
+  enrolledBy   User                  @relation("ClassEnrolledBy", fields: [enrolledById], references: [id], onDelete: Restrict)
+  status       ClassEnrollmentStatus @default(ACTIVE)
+  endedAt      DateTime?
+  createdAt    DateTime              @default(now())
+
+  @@unique([classId, pupilId])
+  @@index([pupilId, status])
+}
+
+model ClassJoinAttempt {
+  id     String   @id @default(uuid())
+  userId String
+  at     DateTime
+
+  @@index([userId, at])
 }

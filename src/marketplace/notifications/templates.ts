@@ -67,6 +67,21 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     ru: { title: 'Преподаватель предложил другое время', body: 'Преподаватель предложил другое время для урока. Примите или отклоните.' },
     en: { title: 'The teacher suggested another time', body: 'The teacher suggested a different time for your lesson. Accept or decline it.' },
   },
+  'class.cancelled': {
+    uz: { title: 'Sinf bekor qilindi', body: "O'qituvchi sinfni bekor qildi. Tafsilotlar ilovada." },
+    ru: { title: 'Класс отменён', body: 'Преподаватель отменил класс. Подробности в приложении.' },
+    en: { title: 'Class cancelled', body: 'The teacher cancelled the class. See the app for details.' },
+  },
+  'class.session_cancelled': {
+    uz: { title: 'Dars bekor qilindi', body: "Sinfning bitta darsi bekor qilindi. Tafsilotlar ilovada." },
+    ru: { title: 'Занятие отменено', body: 'Одно занятие класса отменено. Подробности в приложении.' },
+    en: { title: 'Class session cancelled', body: 'One class session was cancelled. See the app for details.' },
+  },
+  'class.removed': {
+    uz: { title: 'Sinfdan chiqarildi', body: "O'qituvchi sizni sinfdan chiqardi." },
+    ru: { title: 'Вас убрали из класса', body: 'Преподаватель убрал вас из класса.' },
+    en: { title: 'Removed from a class', body: 'The teacher removed you from a class.' },
+  },
   'directpay.reminder': {
     uz: { title: "To'lov haqida eslatma", body: "O'qituvchi o'tgan dars uchun to'lovni eslatdi. Tafsilotlar ilovada." },
     ru: { title: 'Напоминание об оплате', body: 'Преподаватель напомнил об оплате прошедшего урока. Подробности в приложении.' },

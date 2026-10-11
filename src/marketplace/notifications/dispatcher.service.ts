@@ -69,7 +69,7 @@ export function createPushSender(env: NodeJS.ProcessEnv = process.env): PushSend
 
 const MAX_ATTEMPTS = 5;
 /** Push `data` ichiga faqat navigatsiya uchun id'lar kiradi (summalar, vaqtlar, matn kirmaydi: qulf ekranida ko'rinishi mumkin). */
-const PUSH_DATA_KEYS = ['bookingId', 'threadId', 'reviewId', 'payoutId'];
+const PUSH_DATA_KEYS = ['bookingId', 'threadId', 'reviewId', 'payoutId', 'classId', 'sessionId'];
 function pushData(type: string, data: unknown): Record<string, unknown> {
   const src = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
   return { type, ...Object.fromEntries(PUSH_DATA_KEYS.filter((k) => typeof src[k] === 'string').map((k) => [k, src[k]])) };
