@@ -1483,3 +1483,33 @@ model ClassHomeworkSubmission {
   @@unique([homeworkId, pupilId])
   @@index([pupilId])
 }
+
+enum ClassPollStatus {
+  OPEN
+  CLOSED
+}
+
+// R9: bir vaqtda bitta ochiq so'rovnoma (sessiya qatori qulflanib tekshiriladi); ovoz backend orqali, xona xabari orqali emas
+model ClassPoll {
+  id        String          @id @default(uuid())
+  sessionId String
+  question  String
+  options   Json // string[] (2-6)
+  status    ClassPollStatus @default(OPEN)
+  openedAt  DateTime
+  closedAt  DateTime?
+  votes     ClassPollVote[]
+
+  @@index([sessionId, openedAt])
+}
+
+// Kim qaysi variantga ovoz bergani hech qachon tashqariga chiqmaydi (faqat sonlar)
+model ClassPollVote {
+  pollId      String
+  poll        ClassPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  pupilId     String
+  optionIndex Int
+  at          DateTime
+
+  @@id([pollId, pupilId])
+}

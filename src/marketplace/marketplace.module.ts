@@ -37,6 +37,8 @@ import { ClassPaymentsController } from './classes/class-payments.controller';
 import { ClassFeedService } from './classes/class-feed.service';
 import { ClassFeedController } from './classes/class-feed.controller';
 import { ClassRemindersService } from './classes/class-reminders.service';
+import { ClassPollService } from './classes/class-poll.service';
+import { ClassPollController } from './classes/class-poll.controller';
 import { NetCheckController } from './classes/netcheck.controller';
 import { ClassChatService } from './classes/class-chat.service';
 import { ClassChatController } from './classes/class-chat.controller';
@@ -69,7 +71,7 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     JwtModule.registerAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (c: ConfigService) => ({ secret: c.get<string>('JWT_SECRET') }) }),
   ],
   // Tartib muhim: 'teachers/me' controller'i 'teachers/:id' dan oldin turishi kerak
-  controllers: [ClassFeedController, ClassPaymentsController, ClassBoardController, ClassFilesController, ClassPresentController, ClassFilesAdminController, NetCheckController, ClassesController, ClassRoomController, ClassChatController, DirectPaymentController, TeacherMoneyController, MyDirectPaymentsController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
+  controllers: [ClassPollController, ClassFeedController, ClassPaymentsController, ClassBoardController, ClassFilesController, ClassPresentController, ClassFilesAdminController, NetCheckController, ClassesController, ClassRoomController, ClassChatController, DirectPaymentController, TeacherMoneyController, MyDirectPaymentsController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
   providers: [
     ClassesService,
     ClassRoomService,
@@ -78,6 +80,7 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     ClassBoardService,
     ClassPaymentsService,
     ClassFeedService,
+    ClassPollService,
     ClassRemindersService,
     { provide: PDF_RENDERER, useFactory: () => createPdfRenderer() },
     DirectPaymentService,

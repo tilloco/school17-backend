@@ -9,6 +9,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { detectContactInfo } from '../safety/contact-info';
 import { ADULT_AGE, ageInYears } from '../common/actor';
 import { firstName } from './class-rules';
+import { ModuleRef } from '@nestjs/core';
 
 const NOTE_EDIT_MS = 24 * 3_600_000; // dars yozuvi 24 soat tahrirlanadi (C3)
 const MAX = { topic: 200, homework: 1000, next: 500, hwTitle: 200, hwText: 4000, submission: 4000, comment: 1000, answer: 1500 };
@@ -26,7 +27,7 @@ export interface RecapData {
 
 @Injectable()
 export class ClassFeedService {
-  constructor(private prisma: PrismaService, private clock: ClockService, private audit: AuditService, private guardians: GuardianService, private notifications: NotificationsService) {}
+  constructor(private prisma: PrismaService, private clock: ClockService, private audit: AuditService, private guardians: GuardianService, private notifications: NotificationsService, private moduleRef: ModuleRef) {}
 
   // ---------- ruxsat ----------
   private async cls(actor: Actor, classId: string) {
@@ -48,7 +49,7 @@ export class ClassFeedService {
     if (!s) throw new NotFoundException('Session not found');
     return { s, ...(await this.cls(actor, s.classId)) };
   }
-  private async noContact(classId: string, text: string) {
+  async noContact(classId: string, text: string) {
     if (!detectContactInfo(text).found) return;
     const pupils = await this.prisma.classEnrollment.findMany({ where: { classId, status: 'ACTIVE' }, select: { pupil: { select: { dateOfBirth: true } } } });
     const now = this.clock.now();
@@ -84,7 +85,7 @@ export class ClassFeedService {
         answeredList: answered.map((q) => ({ id: q.id, text: q.text, reply: q.replyText })),
       },
       files,
-      polls: [],
+      polls: await this.pollSummary(sessionId),
     };
     await this.prisma.classSessionRecap.create({ data: { sessionId, data: data as any, createdAt: this.clock.now() } });
     try {
@@ -92,6 +93,13 @@ export class ClassFeedService {
     } catch (e: any) {
       if (e?.code !== 'P2002') throw e;
     }
+  }
+
+  /** ClassPollService ModuleRef orqali olinadi (ClassPollService ClassFeedService'ga bog'liq: doiraviy bog'lanishdan qochish) */
+  private async pollSummary(sessionId: string): Promise<unknown[]> {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ClassPollService } = require('./class-poll.service');
+    return this.moduleRef.get(ClassPollService, { strict: false }).closeAllAndSummarize(sessionId);
   }
 
   async recap(actor: Actor, sessionId: string) {
