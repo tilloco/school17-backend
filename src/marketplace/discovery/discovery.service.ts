@@ -81,9 +81,9 @@ export class DiscoveryService {
       ...(q.languages?.length ? { languages: { hasSome: q.languages } } : {}),
       ...(q.minPriceMinor != null || q.maxPriceMinor != null ? { priceMinor: { ...(q.minPriceMinor != null ? { gte: q.minPriceMinor } : {}), ...(q.maxPriceMinor != null ? { lte: q.maxPriceMinor } : {}) } } : {}),
       ...(q.minRating != null ? { ratingBayes: { gte: q.minRating } } : {}),
-      ...(text ? { OR: [{ headline: { contains: text, mode: 'insensitive' } }, { bio: { contains: text, mode: 'insensitive' } }, { user: { name: { contains: text, mode: 'insensitive' } } }] } : {}),
+      ...(text ? { OR: [{ headline: { contains: text, mode: 'insensitive' } }, { bio: { contains: text, mode: 'insensitive' } }, { user: { name: { contains: text, mode: 'insensitive' } } }, { user: { username: { contains: text.replace(/^@/, '').toLowerCase() || '@', mode: 'insensitive' } } }] } : {}),
     };
-    const include = { user: { select: { name: true, avatarUrl: true, timezone: true } } } satisfies Prisma.TeacherProfileInclude;
+    const include = { user: { select: { name: true, username: true, avatarUrl: true, timezone: true } } } satisfies Prisma.TeacherProfileInclude;
 
     let rows;
     let total: number;
@@ -121,6 +121,7 @@ export class DiscoveryService {
       items: rows.map((p) => ({
         id: p.id,
         name: p.user.name,
+        username: p.user.username,
         avatarUrl: p.user.avatarUrl,
         headline: p.headline,
         subjects: p.subjects,

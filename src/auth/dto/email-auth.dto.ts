@@ -8,6 +8,7 @@ export class EmailRegisterDto {
   @IsIn(['STUDENT', 'TEACHER', 'GUARDIAN']) role!: 'STUDENT' | 'TEACHER' | 'GUARDIAN';
   @Matches(/^\d{4}-\d{2}-\d{2}$/) dateOfBirth!: string;
   @IsBoolean() acceptTerms!: boolean;
+  @IsOptional() @IsString() @MaxLength(24) username?: string;
   @IsOptional() @IsIn(['uz', 'ru', 'en']) locale?: 'uz' | 'ru' | 'en';
 }
 

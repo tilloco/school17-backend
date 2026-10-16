@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Actor, ADULT_AGE, ageInYears, MIN_ACCOUNT_AGE } from '../common/actor';
@@ -15,11 +15,14 @@ export function isValidTimezone(tz: string): boolean {
   }
 }
 
+import { normalizeUsername, usernameProblem } from './username';
+
 export interface UpdateMeInput {
   name?: string;
   locale?: string;
   timezone?: string;
   dateOfBirth?: string;
+  username?: string;
 }
 
 @Injectable()
@@ -32,6 +35,7 @@ export class AccountService {
       id: u.id,
       email: u.email,
       name: u.name,
+      username: u.username,
       role: u.role,
       locale: u.locale,
       timezone: u.timezone,
@@ -44,6 +48,14 @@ export class AccountService {
   async update(actor: Actor, input: UpdateMeInput) {
     const data: Record<string, unknown> = {};
     if (input.name !== undefined) data.name = input.name.trim().slice(0, 100);
+    if (input.username !== undefined) {
+      const problem = usernameProblem(input.username);
+      if (problem) throw new BadRequestException({ message: problem === 'RESERVED_USERNAME' ? 'This username is not available' : 'Use 3-20 letters, digits or _, starting with a letter', code: problem });
+      const un = normalizeUsername(input.username);
+      const taken = await this.prisma.user.findFirst({ where: { username: un, id: { not: actor.id } }, select: { id: true } });
+      if (taken) throw new ConflictException({ message: 'This username is taken', code: 'USERNAME_TAKEN' });
+      data.username = un;
+    }
     if (input.locale !== undefined) {
       if (!(LOCALES as readonly string[]).includes(input.locale)) throw new BadRequestException('Unsupported locale');
       data.locale = input.locale;

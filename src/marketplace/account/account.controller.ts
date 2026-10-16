@@ -14,6 +14,7 @@ class DeleteDto {
 
 class UpdateMeDto {
   @IsOptional() @IsString() @MaxLength(100) name?: string;
+  @IsOptional() @IsString() @MaxLength(24) username?: string;
   @IsOptional() @IsString() @MaxLength(5) locale?: string;
   @IsOptional() @IsString() @MaxLength(64) timezone?: string;
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) dateOfBirth?: string;

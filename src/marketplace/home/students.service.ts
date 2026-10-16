@@ -101,6 +101,16 @@ export class StudentsService {
       .slice(0, 300);
   }
 
+  /** O'qituvchi o'quvchini @nomi bo'yicha topadi (kamida 3 belgi, nom boshidan): faqat ko'rinadigan ism va @nom chiqadi, kontakt ma'lumotlari yo'q. */
+  async findPupils(actor: Actor, qIn: string) {
+    await this.teacherId(actor);
+    const q = qIn.trim().replace(/^@/, '').toLowerCase().slice(0, 20);
+    if (q.length < 3) return [];
+    const rows = await this.prisma.user.findMany({ where: { role: 'STUDENT', status: 'ACTIVE', username: { startsWith: q } }, orderBy: { username: 'asc' }, take: 10, select: { name: true, username: true, dateOfBirth: true } });
+    const now = this.clock.now();
+    return rows.map((x) => ({ username: x.username, name: this.nameOf(x, now).name }));
+  }
+
   async detail(actor: Actor, pupilId: string) {
     const teacherId = await this.teacherId(actor);
     const now = this.clock.now();

@@ -9,6 +9,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { createHash, randomInt } from 'crypto';
 import { CodeSender, makeSender, normalizePhone } from './telegram-gateway';
 import { PhoneVerifyDto } from './dto/phone-auth.dto';
+import { normalizeUsername, usernameProblem } from '../marketplace/account/username';
 
 @Injectable()
 export class AuthService {
@@ -59,6 +60,16 @@ export class AuthService {
     return { accessToken, isNewUser };
   }
 
+  /** Ixtiyoriy @nom: noto'g'ri yoki band bo'lsa ro'yxatdan o'tish to'xtatiladi (foydalanuvchi boshqa nom tanlaydi). */
+  private async checkedUsername(raw?: string): Promise<string | undefined> {
+    if (!raw || !raw.trim()) return undefined;
+    const problem = usernameProblem(raw);
+    if (problem) throw new BadRequestException({ message: problem === 'RESERVED_USERNAME' ? 'This username is not available' : 'Use 3-20 letters, digits or _, starting with a letter', code: problem });
+    const un = normalizeUsername(raw);
+    if (await this.prisma.user.findUnique({ where: { username: un }, select: { id: true } })) throw new ConflictException({ message: 'This username is taken', code: 'USERNAME_TAKEN' });
+    return un;
+  }
+
   private generateReferralCode(): string {
     return randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
   }
@@ -82,11 +93,12 @@ export class AuthService {
     const age = (now.getTime() - dob.getTime()) / (365.25 * 86_400_000);
     if (age < AuthService.MIN_AGE[dto.role]) throw new BadRequestException({ message: dto.role === 'STUDENT' ? 'The minimum age is 10' : 'Teachers and guardians must be at least 18', code: 'TOO_YOUNG' });
     if (await this.prisma.user.findUnique({ where: { email } })) throw new ConflictException({ message: 'This email is already registered. Sign in instead.', code: 'EMAIL_TAKEN' });
+    const username = await this.checkedUsername(dto.username);
     const passwordHash = await bcrypt.hash(pw, 11);
     const kinds = dto.role === 'GUARDIAN' ? (['TERMS', 'PRIVACY', 'GUARDIAN_STATEMENT'] as const) : (['TERMS', 'PRIVACY'] as const);
     const user = await this.prisma.user.create({
       data: {
-        email, name: dto.name.trim(), role: dto.role, dateOfBirth: dob, locale: dto.locale ?? 'uz', passwordHash, referralCode: this.generateReferralCode() + randomBytes(2).toString('hex').toUpperCase(),
+        email, username, name: dto.name.trim(), role: dto.role, dateOfBirth: dob, locale: dto.locale ?? 'uz', passwordHash, referralCode: this.generateReferralCode() + randomBytes(2).toString('hex').toUpperCase(),
         consents: { create: kinds.map((kind) => ({ kind, version: CURRENT_VERSIONS[kind], locale: dto.locale ?? 'uz' })) },
       },
     });
@@ -156,11 +168,12 @@ export class AuthService {
       if (isNaN(dob.getTime()) || dob > now || dob.getUTCFullYear() < 1900) throw new BadRequestException({ message: 'Invalid date of birth', code: 'BAD_DOB' });
       const age = (now.getTime() - dob.getTime()) / (365.25 * 86_400_000);
       if (age < AuthService.MIN_AGE[dto.role]) throw new BadRequestException({ message: dto.role === 'STUDENT' ? 'The minimum age is 10' : 'Teachers and guardians must be at least 18', code: 'TOO_YOUNG' });
+      const username = await this.checkedUsername(dto.username);
       const kinds = dto.role === 'GUARDIAN' ? (['TERMS', 'PRIVACY', 'GUARDIAN_STATEMENT'] as const) : (['TERMS', 'PRIVACY'] as const);
       // User.email majburiy va noyob: telefon bilan kirganlarga ichki, hech qachon yetkazilmaydigan manzil beriladi
       user = await this.prisma.user.create({
         data: {
-          email: `tg${phone.slice(1)}@phone.school17.invalid`, phone, name: dto.name.trim(), role: dto.role, dateOfBirth: dob, locale: dto.locale ?? 'uz',
+          email: `tg${phone.slice(1)}@phone.school17.invalid`, phone, username, name: dto.name.trim(), role: dto.role, dateOfBirth: dob, locale: dto.locale ?? 'uz',
           referralCode: this.generateReferralCode() + randomBytes(2).toString('hex').toUpperCase(),
           consents: { create: kinds.map((kind) => ({ kind, version: CURRENT_VERSIONS[kind], locale: dto.locale ?? 'uz' })) },
         },

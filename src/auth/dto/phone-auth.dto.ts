@@ -12,5 +12,6 @@ export class PhoneVerifyDto {
   @IsOptional() @IsIn(['STUDENT', 'TEACHER', 'GUARDIAN']) role?: 'STUDENT' | 'TEACHER' | 'GUARDIAN';
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) dateOfBirth?: string;
   @IsOptional() @IsBoolean() acceptTerms?: boolean;
+  @IsOptional() @IsString() @MaxLength(24) username?: string;
   @IsOptional() @IsIn(['uz', 'ru', 'en']) locale?: 'uz' | 'ru' | 'en';
 }

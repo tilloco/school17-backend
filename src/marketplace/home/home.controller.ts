@@ -25,6 +25,9 @@ export class HomeController {
   @Get('teachers/me/students') @RequirePermission('teacher.profile.manage')
   list(@CurrentActor() a: Actor) { return this.students.list(a); }
 
+  @Get('teachers/me/find-students') @RequirePermission('teacher.profile.manage')
+  find(@CurrentActor() a: Actor, @Query('q') q?: string) { return this.students.findPupils(a, q ?? ''); }
+
   @Get('teachers/me/students/:pupilId') @RequirePermission('teacher.profile.manage')
   detail(@CurrentActor() a: Actor, @Param('pupilId', ParseUUIDPipe) id: string) { return this.students.detail(a, id); }
 }

@@ -96,6 +96,7 @@ model User {
   emailVerifiedAt         DateTime? // Google tasdiqlagan e-pochta; parol bilan ro'yxatdan o'tganda bo'sh (tasdiqlanmagan)
   loginFailCount          Int                @default(0)
   lockedUntil             DateTime?
+  username                String?            @unique // @nom: kichik harf, raqam, pastki chiziq; qidiruvda ishlatiladi
   phone                   String?            @unique // E.164, Telegram kod orqali tasdiqlangan; boshqalarga ko'rsatilmaydi
   dailyStudyMinutes       Int?
   selfLevel               String?
@@ -865,6 +866,7 @@ model Review {
 
 enum ReportTargetType {
   REVIEW
+  COMMENT
   USER
   MESSAGE
   CLASS_FILE
@@ -1558,4 +1560,18 @@ model ClassChannelPost {
   deletedAt DateTime?
 
   @@index([classId, seq])
+}
+
+// O'qituvchi haqida ommaviy izoh: yulduzsiz, sharhdan (Review) farqli — sharhni faqat dars olgan o'quvchi qoldiradi. Har kishi bittadan.
+model TeacherComment {
+  id        String    @id @default(uuid())
+  teacherId String
+  authorId  String
+  text      String    @db.Text
+  hidden    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  editedAt  DateTime?
+
+  @@unique([teacherId, authorId])
+  @@index([teacherId, hidden, createdAt])
 }

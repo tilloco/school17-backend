@@ -206,12 +206,13 @@ export class TeachersService {
   async publicProfile(profileId: string) {
     const p = await this.prisma.teacherProfile.findFirst({
       where: { id: profileId, verificationStatus: VerificationStatus.VERIFIED, user: { status: 'ACTIVE' } },
-      include: { user: { select: { name: true, avatarUrl: true, timezone: true } }, credentials: { where: { status: 'APPROVED' } } },
+      include: { user: { select: { name: true, username: true, avatarUrl: true, timezone: true } }, credentials: { where: { status: 'APPROVED' } } },
     });
     if (!p) throw new NotFoundException('Not found');
     return {
       id: p.id,
       name: p.user.name,
+      username: p.user.username,
       avatarUrl: p.user.avatarUrl,
       timezone: p.user.timezone,
       headline: p.headline,
