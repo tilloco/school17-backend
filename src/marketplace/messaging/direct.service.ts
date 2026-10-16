@@ -46,7 +46,7 @@ export class DirectService {
   /** Suhbatni ochadi yoki mavjudini qaytaradi. */
   async open(actor: Actor, userId: string) {
     if (userId === actor.id) throw new BadRequestException('You cannot message yourself');
-    const other = await this.prisma.user.findFirst({ where: { id: userId, status: 'ACTIVE', role: { not: Role.ADMIN } }, select: { id: true, role: true, dateOfBirth: true, username: true } });
+    const other = await this.prisma.user.findFirst({ where: { id: userId, status: 'ACTIVE', role: { not: Role.ADMIN } }, select: { id: true, role: true, dateOfBirth: true, username: true, dmRequests: true } });
     if (!other) throw new NotFoundException('Not found');
     await this.legal.assertTerms(actor);
     if (await this.blockedEitherWay(actor.id, other.id)) throw new NotFoundException('Not found');
@@ -66,7 +66,7 @@ export class DirectService {
     else [teacherUserId, studentUserId] = me.id < other.id ? [me.id, other.id] : [other.id, me.id];
 
     const existing = await this.prisma.chatThread.findUnique({ where: { teacherUserId_studentUserId: { teacherUserId, studentUserId } } });
-    const thread = existing ?? (await this.prisma.chatThread.create({ data: { teacherUserId, studentUserId, status: rel === 'none' ? 'REQUEST' : 'ACTIVE', requestedById: actor.id } }));
+    const thread = existing ?? (await this.prisma.chatThread.create({ data: { teacherUserId, studentUserId, status: rel === 'none' || (rel === 'classmates' && other.dmRequests) ? 'REQUEST' : 'ACTIVE', requestedById: actor.id } }));
     return (await this.messaging.list(actor)).find((v) => v.id === thread.id) ?? { id: thread.id };
   }
 

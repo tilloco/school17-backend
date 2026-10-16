@@ -25,6 +25,7 @@ export interface UpdateMeInput {
   dateOfBirth?: string;
   username?: string;
   bio?: string;
+  dmRequests?: boolean;
 }
 
 @Injectable()
@@ -39,6 +40,7 @@ export class AccountService {
       name: u.name,
       username: u.username,
       bio: u.bio,
+      dmRequests: u.dmRequests,
       hasPhoto: !!u.avatarFileId,
       role: u.role,
       locale: u.locale,
@@ -65,6 +67,7 @@ export class AccountService {
       if (bio && detectContactInfo(bio).found) throw new BadRequestException({ message: "The bio is public: please don't put a phone number or a link in it", code: 'CONTACT_INFO_NOT_ALLOWED' });
       data.bio = bio || null;
     }
+    if (input.dmRequests !== undefined) data.dmRequests = input.dmRequests;
     if (input.locale !== undefined) {
       if (!(LOCALES as readonly string[]).includes(input.locale)) throw new BadRequestException('Unsupported locale');
       data.locale = input.locale;

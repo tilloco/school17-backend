@@ -46,6 +46,19 @@ describe('direct messages, avatars, class reviews and comment reports (integrati
     assert.deepEqual(contacts.map((c: any) => c.userId).sort(), [b.id, x.user.id].sort());
   });
 
+  it('"message requests" switch: off by default; when on, classmates land in requests but the teacher still gets through directly', async () => {
+    const a = await named(Role.STUDENT, 'anvar');
+    const b = await named(Role.STUDENT, 'bobur');
+    const { x } = await classWith(a, b);
+    assert.equal((await api(t, b.token).get('/me')).body.dmRequests, false);
+    assert.equal((await api(t, b.token).patch('/me', { dmRequests: true })).status, 200);
+    assert.equal((await api(t, b.token).get('/me')).body.dmRequests, true);
+    const open = await api(t, a.token).post('/threads/direct', { userId: b.id });
+    assert.equal(open.body.status, 'REQUEST');
+    const teacher = await api(t, x.user.token).post('/threads/direct', { userId: b.id });
+    assert.equal(teacher.body.status, 'ACTIVE', 'teacher is never filtered');
+  });
+
   it('message request: one message until accepted; replying accepts; declining stops it', async () => {
     const a = await named(Role.STUDENT, 'sender');
     const c = await named(Role.TEACHER, 'ustoz');

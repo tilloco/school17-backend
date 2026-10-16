@@ -14,6 +14,8 @@ case "$1" in
     "$PGBIN/pg_ctl" -D "$DIR/data" -o "-p $PORT -c listen_addresses=127.0.0.1" -l "$DIR/pg.log" -w start >/dev/null || true
     "$PGBIN/psql" -h 127.0.0.1 -p $PORT -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='school17_test'" | grep -q 1 \
       || "$PGBIN/createdb" -h 127.0.0.1 -p $PORT -U postgres school17_test
+    # A second database for the phone demo, so running the test suite never fills the demo with test data
+    "$PGBIN/psql" -h 127.0.0.1 -p $PORT -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='school17_demo_test'" | grep -q 1       || "$PGBIN/createdb" -h 127.0.0.1 -p $PORT -U postgres school17_demo_test
     echo "postgresql://postgres@127.0.0.1:$PORT/school17_test?schema=public" ;;
   stop) "$PGBIN/pg_ctl" -D "$DIR/data" stop ;;
   url) echo "postgresql://postgres@127.0.0.1:$PORT/school17_test?schema=public" ;;

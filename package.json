@@ -1,7 +1,7 @@
 {
-  "name": "huquq-backend",
+  "name": "school17-backend",
   "version": "0.1.0",
-  "description": "Huquq imtihoniga tayyorgarlik - backend API",
+  "description": "School17 - free tutoring marketplace API",
   "private": true,
   "scripts": {
     "build": "nest build",
@@ -11,7 +11,6 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "ts-node prisma/seed.ts",
     "admin:create": "ts-node prisma/create-admin.ts",
     "test": "node --require ts-node/register/transpile-only --test --test-concurrency=1 \"src/**/*.spec.ts\" \"../shared/*.spec.ts\"",
     "test:unit": "node --require ts-node/register/transpile-only --test \"src/**/*.unit.spec.ts\" \"../shared/*.spec.ts\"",
@@ -19,7 +18,6 @@
     "db:dev": "bash scripts/dev-db.sh start"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.11",
