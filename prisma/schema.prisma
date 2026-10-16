@@ -1587,3 +1587,25 @@ enum ThreadStatus {
   REQUEST
   DECLINED
 }
+
+// O'qituvchi sinfdagi a'lochi o'quvchiga qo'shimcha ball ("bonus") beradi; reytingga qo'shiladi
+model ClassBonus {
+  id        String   @id @default(uuid())
+  classId   String
+  pupilId   String
+  points    Int
+  note      String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([classId, pupilId])
+}
+
+// Sinf kanalida har bir a'zo qaysi xabargacha o'qiganini saqlaydi (o'qilmagan sonini hisoblash uchun)
+model ClassChannelRead {
+  classId String
+  userId  String
+  lastSeq Int     @default(0)
+
+  @@id([classId, userId])
+  @@index([userId])
+}

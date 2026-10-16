@@ -29,8 +29,10 @@ export class ClassChannelService {
   }
 
   private async view(actor: Actor, teacherUserId: string, rows: { id: string; seq: number; authorId: string; body: string; fileId: string | null; createdAt: Date }[]) {
-    const authors = await this.prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.authorId))] } }, select: { id: true, name: true } });
+    const authors = await this.prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.authorId))] } }, select: { id: true, name: true, username: true, dateOfBirth: true, avatarFileId: true } });
     const names = new Map(authors.map((a) => [a.id, a.name]));
+    const info = new Map(authors.map((a) => [a.id, a]));
+    const now = this.clock.now();
     const fileIds = rows.map((r) => r.fileId).filter((x): x is string => !!x);
     const files = fileIds.length ? await this.prisma.storedFile.findMany({ where: { id: { in: fileIds } } }) : [];
     const byId = new Map(files.map((f) => [f.id, f]));
@@ -39,7 +41,13 @@ export class ClassChannelService {
       const mime = f?.finalMime ?? f?.mime ?? '';
       return {
         id: r.id, seq: r.seq, at: r.createdAt, body: r.body, mine: r.authorId === actor.id,
-        author: { id: r.authorId, name: names.get(r.authorId) ?? null, teacher: r.authorId === teacherUserId },
+        // a minor's @username, photo and id are shown only to the class teacher (and to the minor); classmates see the name only
+        author: (() => {
+          const a = info.get(r.authorId);
+          const minor = !a?.dateOfBirth || ageInYears(a.dateOfBirth, now) < ADULT_AGE;
+          const show = !minor || r.authorId === teacherUserId || actor.id === teacherUserId || r.authorId === actor.id;
+          return { id: show ? r.authorId : null, name: names.get(r.authorId) ?? null, teacher: r.authorId === teacherUserId, username: show ? a?.username ?? null : null, hasPhoto: show && !!a?.avatarFileId };
+        })(),
         file: f && !f.deletedAt ? { id: f.id, name: f.originalName, size: f.sizeBytes, mime, image: mime.startsWith('image/') } : null,
       };
     });
@@ -50,7 +58,25 @@ export class ClassChannelService {
     const where = { classId, deletedAt: null, ...(opts.before ? { seq: { lt: opts.before } } : {}), ...(opts.after ? { seq: { gt: opts.after } } : {}) };
     const rows = await this.prisma.classChannelPost.findMany({ where, orderBy: { seq: opts.after ? 'asc' : 'desc' }, take: PAGE });
     if (!opts.after) rows.reverse();
+    const top = rows.length ? Math.max(...rows.map((x) => x.seq)) : 0;
+    if (top) await this.prisma.classChannelRead.upsert({ where: { classId_userId: { classId, userId: actor.id } }, create: { classId, userId: actor.id, lastSeq: top }, update: { lastSeq: top } }).catch(() => undefined);
     return { items: await this.view(actor, c.teacherUserId, rows), more: rows.length === PAGE };
+  }
+
+  /** Har bir sinf kanalidagi o'qilmagan xabarlar soni (o'zingiznikidan tashqari). */
+  async unreadByClass(actor: Actor): Promise<Record<string, number>> {
+    const teaching = actor.role === Role.TEACHER ? await this.prisma.class.findMany({ where: { teacher: { userId: actor.id }, status: 'ACTIVE' }, select: { id: true } }) : [];
+    const joined = await this.prisma.classEnrollment.findMany({ where: { pupilId: actor.id, status: 'ACTIVE', class: { status: 'ACTIVE' } }, select: { classId: true } });
+    const ids = [...new Set([...teaching.map((x) => x.id), ...joined.map((x) => x.classId)])];
+    if (!ids.length) return {};
+    const reads = await this.prisma.classChannelRead.findMany({ where: { userId: actor.id, classId: { in: ids } } });
+    const last = new Map(reads.map((x) => [x.classId, x.lastSeq]));
+    const out: Record<string, number> = {};
+    for (const id of ids) {
+      const n = await this.prisma.classChannelPost.count({ where: { classId: id, deletedAt: null, authorId: { not: actor.id }, seq: { gt: last.get(id) ?? 0 } } });
+      if (n) out[id] = n;
+    }
+    return out;
   }
 
   async post(actor: Actor, classId: string, input: { body?: string; fileId?: string }) {
@@ -72,6 +98,7 @@ export class ClassChannelService {
       if (await this.prisma.classChannelPost.findUnique({ where: { fileId: f.id } })) throw new ConflictException('File already sent');
     }
     const row = await this.prisma.classChannelPost.create({ data: { classId, authorId: actor.id, body, fileId: input.fileId ?? null, createdAt: this.clock.now() } });
+    await this.prisma.classChannelRead.upsert({ where: { classId_userId: { classId, userId: actor.id } }, create: { classId, userId: actor.id, lastSeq: row.seq }, update: { lastSeq: row.seq } }).catch(() => undefined);
     const [item] = await this.view(actor, c.teacherUserId, [row]);
     const members = await this.prisma.classEnrollment.findMany({ where: { classId, status: 'ACTIVE' }, select: { pupilId: true } });
     for (const u of [c.teacherUserId, ...members.map((m) => m.pupilId)]) if (u !== actor.id) this.realtime.emitToUser(u, 'class.channel', { classId, seq: row.seq });
