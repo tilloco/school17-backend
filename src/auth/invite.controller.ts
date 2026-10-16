@@ -18,6 +18,17 @@ export class InviteController {
   }
 }
 
+/** Tiny public endpoint the app calls every few seconds to measure the connection (round-trip time) and to notice when the server cannot be reached. Returns no data. */
+@Controller('ping')
+export class PingController {
+  @SkipThrottle()
+  @Get()
+  @Header('Cache-Control', 'no-store')
+  ping() {
+    return { ok: true };
+  }
+}
+
 /** Teacher profile link to share on Telegram: https://<server>/p/<profileId> opens the teacher's page in the app. */
 @Controller('p')
 export class ProfileLinkController {
