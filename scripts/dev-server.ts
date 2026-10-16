@@ -120,6 +120,36 @@ async function seedDemo(prisma: any) {
 @Module({ imports: [AppModule], controllers: [DevLoginController] })
 class DevRootModule {}
 
+/** A ready class for the demo teacher (Dilnoza) with the four demo pupils, a few lessons and some channel messages, so the screens have something to show. */
+async function seedDemoClass(port: number) {
+  const base = `http://127.0.0.1:${port}`;
+  const call = async (path: string, token: string | null, body?: unknown, method = body === undefined ? 'GET' : 'POST') => {
+    const r = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
+    return { status: r.status, body: await r.json().catch(() => ({})) as any };
+  };
+  const login = async (role: string, slot: number) => (await call('/dev/login', null, { role, slot })).body.accessToken as string;
+  const teacher = await login('TEACHER', 1);
+  const mine = (await call('/classes/mine', teacher)).body as { title: string }[];
+  const existing = Array.isArray(mine) ? (mine as any[]).find((c) => c.title === 'Matematika, 9-sinf') : null;
+  if (existing) {
+    // the shared test database may have been used by the test suite (it moves the clock), so make sure there are lessons ahead
+    const sess = (await call(`/classes/${existing.id}/sessions`, teacher)).body as { status: string; startAt: string }[];
+    if (!Array.isArray(sess) || !sess.some((x) => x.status === 'SCHEDULED' && new Date(x.startAt) > new Date()))
+      for (const days of [1, 3, 5]) await call(`/classes/${existing.id}/sessions`, teacher, { startAt: new Date(Date.now() + days * 86_400_000).toISOString(), durationMin: 60 });
+    return;
+  }
+  for (const c of Array.isArray(mine) ? (mine as any[]) : []) if (/^Math( 00\.1)?$/.test(c.title)) await call(`/classes/${c.id}/cancel`, teacher, {});
+  const made = (await call('/classes', teacher, { title: 'Matematika, 9-sinf', subject: 'Matematika', description: 'Haftada 3 marta, imtihonga tayyorlov.' })).body;
+  if (!made.id) return;
+  const pupils: string[] = [];
+  for (let i = 1; i <= 4; i++) { const tk = await login('STUDENT', i); pupils.push(tk); await call('/classes/join', tk, { code: made.joinCode }); }
+  for (const days of [1, 3, 5]) await call(`/classes/${made.id}/sessions`, teacher, { startAt: new Date(Date.now() + days * 86_400_000).toISOString(), durationMin: 60 });
+  await call(`/classes/${made.id}/channel`, teacher, { body: "Salom, hammaga! Bu sinfning kanali. Savollaringizni shu yerga yozing, uy vazifasini ham shu yerga yuboring." });
+  await call(`/classes/${made.id}/channel`, pupils[0], { body: "Assalomu alaykum, ustoz! Birinchi dars soat nechada?" });
+  await call(`/classes/${made.id}/channel`, teacher, { body: "Dushanba kuni 18:00 da. Daftar va kalkulyatorni olib keling." });
+  await call(`/classes/${made.id}/channel`, pupils[1], { body: "Rahmat, ustoz!" });
+}
+
 async function main() {
   mkdirSync(join(process.cwd(), 'uploads', 'avatars'), { recursive: true });
   const app = await NestFactory.create<NestExpressApplication>(DevRootModule);
@@ -128,6 +158,7 @@ async function main() {
   await seedDemo(app.get(PrismaService)).catch((e: unknown) => console.log('demo seed skipped:', (e as Error).message));
   const port = Number(process.env.PORT || 3100);
   await app.listen(port, '0.0.0.0');
+  await seedDemoClass(port).catch((e: unknown) => console.log('demo class skipped:', (e as Error).message));
   console.log(`DEV BACKEND on http://localhost:${port} (local database only). POST /dev/login {role} gives a test token.`);
 }
 main();
