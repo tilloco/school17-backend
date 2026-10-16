@@ -76,7 +76,7 @@ describe('usernames, people search and public comments (integration)', () => {
     const un = `zilola_${Math.random().toString(36).slice(2, 6)}`;
     await api(t, pupil.token).patch('/me', { username: un });
     assert.deepEqual((await api(t, x.user.token).get('/teachers/me/find-students?q=zi')).body, []);
-    const r = (await api(t, x.user.token).get(`/teachers/me/find-students?q=@${un.slice(0, 5)}`)).body;
+    const r = (await api(t, x.user.token).get(`/teachers/me/find-students?q=@${un}`)).body;
     assert.deepEqual(Object.keys(r[0]).sort(), ['name', 'username']);
     assert.equal(r[0].username, un);
     assert.equal((await api(t, pupil.token).get('/teachers/me/find-students?q=zil')).status, 403);

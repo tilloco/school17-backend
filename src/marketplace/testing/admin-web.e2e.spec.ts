@@ -14,7 +14,7 @@ import { api, createTestApp, makePdf, makeTeacher, makeThread, makeUser, TestApp
 
 const ADMIN_DIR = join(__dirname, '..', '..', '..', '..', 'admin');
 const BUILT = existsSync(join(ADMIN_DIR, '.next', 'BUILD_ID'));
-const PORT = 3101;
+const PORT = Number(process.env.ADMIN_E2E_PORT) || 3101; // set ADMIN_E2E_PORT when 3101 is taken by a dev server
 const WEB = `http://127.0.0.1:${PORT}`;
 
 describe('admin web panel end-to-end (real Next build)', { skip: BUILT ? false : 'admin/.next is missing: run `npm run build` in admin/' }, () => {
