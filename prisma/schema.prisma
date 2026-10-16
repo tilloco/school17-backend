@@ -91,6 +91,12 @@ model User {
   linkCodes               GuardianLinkCode[] @relation("LinkCodeStudent")
   consents                Consent[]          @relation("UserConsents")
   pushTokens              PushToken[]        @relation("UserPushTokens")
+  notifPref NotificationPreference? @relation("UserNotifPref")
+  passwordHash            String? // e-pochta bilan kirish (bcrypt); Google/Telegram orqali kirganlarda bo'sh
+  emailVerifiedAt         DateTime? // Google tasdiqlagan e-pochta; parol bilan ro'yxatdan o'tganda bo'sh (tasdiqlanmagan)
+  loginFailCount          Int                @default(0)
+  lockedUntil             DateTime?
+  phone                   String?            @unique // E.164, Telegram kod orqali tasdiqlangan; boshqalarga ko'rsatilmaydi
   dailyStudyMinutes       Int?
   selfLevel               String?
   onboardingCompleted     Boolean            @default(false)
@@ -712,6 +718,7 @@ model Notification {
   sentAt    DateTime?
   readAt    DateTime?
   dedupeKey String?
+  pushAfter DateTime? // tinch soatlar: push shu vaqtdan oldin yuborilmaydi (ilova ichidagi ro'yxatga ta'sir qilmaydi)
   attempts  Int       @default(0)
   lastError String?
   createdAt DateTime  @default(now())
@@ -1182,6 +1189,7 @@ model Class {
   sessions          ClassSession[]
   enrollments       ClassEnrollment[]
   payments          ClassPayment[]
+  homeworks         ClassHomework[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -1457,6 +1465,7 @@ model ClassSessionRecap {
 model ClassHomework {
   id          String   @id @default(uuid())
   classId     String
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   feedPostId  String?
   title       String
   text        String   @default("")
@@ -1512,4 +1521,27 @@ model ClassPollVote {
   at          DateTime
 
   @@id([pollId, pupilId])
+}
+
+// Push sozlamalari: o'chirilgan toifalar va tinch soatlar (foydalanuvchi vaqt zonasida, daqiqa hisobida)
+model NotificationPreference {
+  userId        String   @id
+  user          User     @relation("UserNotifPref", fields: [userId], references: [id], onDelete: Cascade)
+  disabled      String[] @default([])
+  quietStartMin Int?
+  quietEndMin   Int?
+  updatedAt     DateTime @updatedAt
+}
+
+// Telegram Gateway orqali yuboriladigan bir martalik kirish kodlari (kod o'zi saqlanmaydi, faqat xesh)
+model PhoneLoginCode {
+  id        String   @id @default(uuid())
+  phone     String
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
 }
