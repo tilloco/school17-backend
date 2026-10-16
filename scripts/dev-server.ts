@@ -84,6 +84,39 @@ class DevLoginController {
 
 }
 
+// Sample people for local testing (idempotent). Same e-mail scheme as /dev/login, so "Teacher" / "Pupil" buttons log into the first of each.
+const DEMO_TEACHERS = [
+  { name: 'Dilnoza Karimova', headline: 'IELTS and General English, 8 years', subjects: ['english'], levels: ['adult', 'grades_10_11'], price: 8_000_000, count: 41, avg: 4.9 },
+  { name: 'Jasur Aliyev', headline: 'Math for exams: grades 9-11 and university entry', subjects: ['math'], levels: ['grades_10_11', 'grades_5_9'], price: 6_000_000, count: 27, avg: 4.8 },
+  { name: 'Malika Yusupova', headline: 'Russian language for school and for adults', subjects: ['russian'], levels: ['grades_5_9', 'adult'], price: 5_000_000, count: 12, avg: 4.7 },
+  { name: 'Bekzod Rahimov', headline: 'Physics made simple, with experiments', subjects: ['physics'], levels: ['grades_5_9', 'grades_10_11'], price: 7_000_000, count: 9, avg: 4.6 },
+  { name: 'Nigora Saidova', headline: 'Chemistry and biology for medical entry', subjects: ['chemistry', 'biology'], levels: ['grades_10_11'], price: 9_000_000, count: 18, avg: 4.9 },
+];
+const DEMO_PUPILS = ['Aziz Tursunov', 'Madina Ergasheva', 'Sardor Nazarov', 'Zilola Qodirova'];
+
+async function seedDemo(prisma: any) {
+  const kinds = ['TERMS', 'PRIVACY'];
+  const make = async (role: 'TEACHER' | 'STUDENT', slot: number, name: string, dob: string) => {
+    const email = `dev-${role.toLowerCase()}-${slot}@test.local`;
+    let user = await prisma.user.findFirst({ where: { email } });
+    if (!user) {
+      const id = randomUUID();
+      user = await prisma.user.create({ data: { id, email, name, referralCode: `R${id.replace(/-/g, '').slice(0, 10)}`, role, status: 'ACTIVE', dateOfBirth: new Date(`${dob}T00:00:00.000Z`), timezone: 'Asia/Tashkent', locale: 'en' } });
+      for (const kind of kinds) await prisma.consent.create({ data: { userId: id, kind, version: '2026-10-draft-1' } }).catch(() => undefined);
+    } else if (user.name !== name) user = await prisma.user.update({ where: { id: user.id }, data: { name } });
+    return user;
+  };
+  for (let i = 0; i < DEMO_TEACHERS.length; i++) {
+    const d = DEMO_TEACHERS[i];
+    const user = await make('TEACHER', i + 1, d.name, '1990-01-01');
+    const data = { headline: d.headline, bio: `${d.headline}. I teach online in Uzbek, Russian and English. Lessons are 60 minutes; the first one can be a short trial so we can see if we fit. Homework after every lesson, and I write a short note to the parent or pupil about progress.`, subjects: d.subjects, levels: d.levels, languages: ['uz', 'ru', 'en'], priceMinor: d.price, instantBooking: i % 2 === 0, verificationStatus: 'VERIFIED', verifiedAt: new Date(), ratingCount: d.count, ratingSum: Math.round(d.count * d.avg), ratingBayes: d.avg - 0.2 };
+    const has = await prisma.teacherProfile.findFirst({ where: { userId: user.id } });
+    if (has) await prisma.teacherProfile.update({ where: { id: has.id }, data });
+    else await prisma.teacherProfile.create({ data: { userId: user.id, ...data, availability: { create: [1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, startMinute: 600, endMinute: 1200 })) } } });
+  }
+  for (let i = 0; i < DEMO_PUPILS.length; i++) await make('STUDENT', i + 1, DEMO_PUPILS[i], '2000-05-05');
+}
+
 @Module({ imports: [AppModule], controllers: [DevLoginController] })
 class DevRootModule {}
 
@@ -92,6 +125,7 @@ async function main() {
   const app = await NestFactory.create<NestExpressApplication>(DevRootModule);
   app.getHttpAdapter().getInstance().set('trust proxy', Number(process.env.TRUST_PROXY));
   configureHttpSecurity(app);
+  await seedDemo(app.get(PrismaService)).catch((e: unknown) => console.log('demo seed skipped:', (e as Error).message));
   const port = Number(process.env.PORT || 3100);
   await app.listen(port, '0.0.0.0');
   console.log(`DEV BACKEND on http://localhost:${port} (local database only). POST /dev/login {role} gives a test token.`);
