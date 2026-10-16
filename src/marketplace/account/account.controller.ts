@@ -44,6 +44,11 @@ export class AccountController {
     return this.account.me(actor);
   }
 
+  /** @nom bo'sh va yaroqlimi (yozish paytida tekshiriladi). */
+  @Get('username-check')
+  @RequirePermission('account.read.self')
+  usernameCheck(@CurrentActor() actor: Actor, @Query('u') u = '') { return this.account.usernameCheck(actor, u); }
+
   @Patch()
   @RequirePermission('account.read.self')
   update(@CurrentActor() actor: Actor, @Body() dto: UpdateMeDto) {

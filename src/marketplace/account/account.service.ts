@@ -51,6 +51,13 @@ export class AccountService {
     };
   }
 
+  async usernameCheck(actor: Actor, raw: string) {
+    const problem = usernameProblem(raw);
+    if (problem) return { ok: false, reason: problem === 'RESERVED_USERNAME' ? 'TAKEN' : 'BAD' };
+    const taken = await this.prisma.user.findFirst({ where: { username: normalizeUsername(raw), id: { not: actor.id } }, select: { id: true } });
+    return taken ? { ok: false, reason: 'TAKEN' } : { ok: true };
+  }
+
   async update(actor: Actor, input: UpdateMeInput) {
     const data: Record<string, unknown> = {};
     if (input.name !== undefined) data.name = input.name.trim().slice(0, 100);

@@ -59,6 +59,16 @@ describe('direct messages, avatars, class reviews and comment reports (integrati
     assert.equal(teacher.body.status, 'ACTIVE', 'teacher is never filtered');
   });
 
+  it('username check: taken names (any letter case) are rejected, free ones pass', async () => {
+    const a = await named(Role.STUDENT, 'karim');
+    const b = await makeUser(t, Role.STUDENT);
+    const chk = async (u: string) => (await api(t, b.token).get(`/me/username-check?u=${encodeURIComponent(u)}`)).body;
+    assert.deepEqual(await chk(a.username.toUpperCase()), { ok: false, reason: 'TAKEN' });
+    assert.equal((await chk('ab')).ok, false);
+    assert.equal((await chk(uname('free'))).ok, true);
+    assert.equal((await api(t, b.token).patch('/me', { username: a.username.toUpperCase() })).status, 409);
+  });
+
   it('message request: one message until accepted; replying accepts; declining stops it', async () => {
     const a = await named(Role.STUDENT, 'sender');
     const c = await named(Role.TEACHER, 'ustoz');
