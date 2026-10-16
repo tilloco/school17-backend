@@ -104,6 +104,12 @@ async function seedDemo(prisma: any) {
       user = await prisma.user.create({ data: { id, email, name, referralCode: `R${id.replace(/-/g, '').slice(0, 10)}`, role, status: 'ACTIVE', dateOfBirth: new Date(`${dob}T00:00:00.000Z`), timezone: 'Asia/Tashkent', locale: 'en' } });
       for (const kind of kinds) await prisma.consent.create({ data: { userId: id, kind, version: '2026-10-draft-1' } }).catch(() => undefined);
     } else if (user.name !== name) user = await prisma.user.update({ where: { id: user.id }, data: { name } });
+    // a @username and a short "about me" so the profile cards have something to show
+    if (!user.username || !user.bio) {
+      const slug = name.toLowerCase().replace(/[^a-z]+/g, '_').replace(/^_|_$/g, '').slice(0, 18);
+      const bio = role === 'TEACHER' ? 'Online teacher. Clear explanations, homework after every lesson.' : "O'qiyman, matematika va shaxmatni yaxshi ko'raman.";
+      user = await prisma.user.update({ where: { id: user.id }, data: { username: user.username ?? slug, bio: user.bio ?? bio } }).catch(() => user);
+    }
     return user;
   };
   for (let i = 0; i < DEMO_TEACHERS.length; i++) {
