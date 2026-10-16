@@ -1545,3 +1545,17 @@ model PhoneLoginCode {
 
   @@index([phone, createdAt])
 }
+
+// Sinf kanali (Telegram guruhi kabi): o'qituvchi va sinf a'zolarining doimiy yozishmasi, rasm va fayllar bilan
+model ClassChannelPost {
+  id        String    @id @default(uuid())
+  seq       Int       @unique @default(autoincrement())
+  classId   String
+  authorId  String
+  body      String    @default("")
+  fileId    String?   @unique
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@index([classId, seq])
+}

@@ -59,7 +59,7 @@ describe('classes: model and enrollment (R1, integration)', () => {
     clock.set(new Date('2026-11-09T00:00:00Z'));
     assert.equal(await t.app.get(svc).ensureSessions(c.id), 2, 'a week later: one more week is added');
     clock.set(NOW);
-    for (const bad of [{ capacity: 31 }, { capacity: 0 }, { weekdays: [8] }, { weekdays: [] }, { startMinute: 2000 }, { durationMin: 5 }, { priceMinor: -1 }, { timezone: 'Mars/Base' }, { oneOffStartAt: '2026-11-05T10:00:00Z' }]) {
+    for (const bad of [{ capacity: 501 }, { capacity: 0 }, { weekdays: [8] }, { startMinute: 2000 }, { durationMin: 5 }, { priceMinor: -1 }, { timezone: 'Mars/Base' }, { oneOffStartAt: '2026-11-05T10:00:00Z' }]) {
       const r = await api(t, x.user.token).post('/classes', weekly(bad));
       assert.equal(r.status, 400, JSON.stringify(bad));
     }

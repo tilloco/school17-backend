@@ -102,10 +102,20 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     ru: { title: 'Задание проверено', body: 'Преподаватель проверил домашнее задание.' },
     en: { title: 'Homework marked', body: 'Your teacher marked the homework.' },
   },
+  'push.test': {
+    uz: { title: 'Sinov bildirishnomasi', body: 'Bildirishnomalar shu qurilmada ishlayapti.' },
+    ru: { title: 'Тестовое уведомление', body: 'Уведомления на этом устройстве работают.' },
+    en: { title: 'Test notification', body: 'Notifications work on this device.' },
+  },
   'class.cancelled': {
     uz: { title: 'Sinf bekor qilindi', body: "O'qituvchi sinfni bekor qildi. Tafsilotlar ilovada." },
     ru: { title: 'Класс отменён', body: 'Преподаватель отменил класс. Подробности в приложении.' },
     en: { title: 'Class cancelled', body: 'The teacher cancelled the class. See the app for details.' },
+  },
+  'class.session_added': {
+    uz: { title: "Yangi dars qo'shildi", body: "O'qituvchi sinfga yangi dars qo'ydi. Vaqti ilovada." },
+    ru: { title: 'Добавлено занятие', body: 'Преподаватель назначил новое занятие. Время — в приложении.' },
+    en: { title: 'New lesson scheduled', body: 'Your teacher scheduled a new lesson. See the time in the app.' },
   },
   'class.session_cancelled': {
     uz: { title: 'Dars bekor qilindi', body: "Sinfning bitta darsi bekor qilindi. Tafsilotlar ilovada." },

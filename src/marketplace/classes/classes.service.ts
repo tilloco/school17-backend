@@ -18,7 +18,7 @@ export interface ClassInput {
   title: string;
   subject: string;
   description?: string;
-  capacity: number;
+  capacity?: number;
   priceMinor?: number;
   priceModel?: 'PER_SESSION' | 'MONTHLY';
   weekdays?: number[];
@@ -88,7 +88,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
   private validate(input: ClassInput, partial = false) {
     const cfg = marketConfig();
     const bad = (m: string) => { throw new BadRequestException(m); };
-    if (!partial || input.capacity !== undefined) if (!Number.isInteger(input.capacity) || input.capacity < 1 || input.capacity > cfg.classMaxPupils) bad(`capacity must be 1..${cfg.classMaxPupils}`);
+    if (input.capacity !== undefined) if (!Number.isInteger(input.capacity) || input.capacity < 1 || input.capacity > cfg.classMaxPupils) bad(`capacity must be 1..${cfg.classMaxPupils}`);
     if (input.priceMinor !== undefined && (!Number.isInteger(input.priceMinor) || input.priceMinor < 0 || input.priceMinor > 1_000_000_000)) bad('Bad price');
     if (input.weekdays && (input.weekdays.length > 7 || input.weekdays.some((d) => !Number.isInteger(d) || d < 1 || d > 7) || new Set(input.weekdays).size !== input.weekdays.length)) bad('Bad weekdays');
     if (input.startMinute !== undefined && (!Number.isInteger(input.startMinute) || input.startMinute < 0 || input.startMinute > 1439)) bad('Bad start time');
@@ -101,7 +101,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     const now = this.clock.now();
     const oneOff = input.oneOffStartAt ? new Date(input.oneOffStartAt) : null;
     if (oneOff && (isNaN(oneOff.getTime()) || oneOff <= now)) throw new BadRequestException('One-off time must be in the future');
-    if (!oneOff && !(input.weekdays?.length)) throw new BadRequestException('Give weekdays or a one-off time');
+    // Jadval majburiy emas: sinf avval kanal sifatida ochiladi, darslar keyin "Dars qo'shish" bilan qo'yiladi
     if (oneOff && input.weekdays?.length) throw new BadRequestException('Either weekdays or a one-off time, not both');
     const startDate = input.startDate ? new Date(input.startDate) : null;
     const endDate = input.endDate ? new Date(input.endDate) : null;
@@ -116,7 +116,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
       try {
         const c = await this.prisma.class.create({
           data: {
-            teacherId: t.id, title: input.title.trim(), subject: input.subject.trim(), description: (input.description ?? '').trim(), capacity: input.capacity,
+            teacherId: t.id, title: input.title.trim(), subject: input.subject.trim(), description: (input.description ?? '').trim(), capacity: input.capacity ?? marketConfig().classMaxPupils,
             priceMinor: input.priceMinor ?? 0, priceModel: input.priceModel ?? 'PER_SESSION', weekdays: oneOff ? [] : input.weekdays ?? [], startMinute: input.startMinute ?? 0,
             durationMin: input.durationMin ?? 60, timezone: tz, startDate, endDate, oneOffStartAt: oneOff,
             stageMode: input.stageMode ?? 'HAND_RAISE', chatMode: input.chatMode ?? 'OPEN', questionsMode: input.questionsMode ?? 'OPEN',
@@ -153,6 +153,24 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     }
     await this.audit.log(actor, { action: 'class.update', targetType: 'Class', targetId: id });
     return this.teacherView(id);
+  }
+
+  /** O'qituvchi sinfga bitta dars qo'shadi (istalgan paytda, jadvalsiz ham). */
+  async addSession(actor: Actor, id: string, input: { startAt: string; durationMin?: number }) {
+    const { c } = await this.ownClass(actor, id);
+    if (c.status !== 'ACTIVE') throw new ConflictException('Class is not active');
+    const start = new Date(input.startAt);
+    if (isNaN(start.getTime()) || start <= this.clock.now()) throw new BadRequestException('The lesson must start in the future');
+    const dur = input.durationMin ?? c.durationMin;
+    if (!Number.isInteger(dur) || dur < 15 || dur > 240) throw new BadRequestException('Bad duration');
+    const hadAny = (await this.prisma.classSession.count({ where: { classId: id } })) > 0;
+    const s = await this.prisma.classSession.create({
+      data: { classId: id, startAt: start, endAt: new Date(start.getTime() + dur * 60_000), isTrial: c.firstSessionTrial && !hadAny, stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode, slowModeSeconds: c.slowModeSeconds, handRaiseOn: c.handRaiseOn },
+    });
+    await this.reminders.sync(id);
+    await this.notifyClass(id, (uid) => this.notifications.enqueue(uid, 'class.session_added', { classId: id, sessionId: s.id }));
+    await this.audit.log(actor, { action: 'class.session.add', targetType: 'ClassSession', targetId: s.id });
+    return { id: s.id, startAt: s.startAt, endAt: s.endAt };
   }
 
   async cancel(actor: Actor, id: string) {

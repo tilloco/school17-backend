@@ -1,0 +1,89 @@
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Role, StoredFile } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { Actor, ADULT_AGE, ageInYears } from '../common/actor';
+import { ClockService } from '../common/clock';
+import { RealtimeService } from '../messaging/realtime.service';
+import { detectContactInfo } from '../safety/contact-info';
+
+export const CHANNEL_MAX_CHARS = 2000;
+const PAGE = 50;
+
+/**
+ * Sinf kanali: Telegram guruhi kabi — o'qituvchi va sinfga yozilgan o'quvchilar matn, rasm va fayl yozadi.
+ * Ruxsat: sinf o'qituvchisi yoki faol a'zo; begona uchun "topilmadi" (404). O'quvchi o'z xabarini, o'qituvchi istalganini o'chiradi.
+ */
+@Injectable()
+export class ClassChannelService {
+  constructor(private prisma: PrismaService, private clock: ClockService, private realtime: RealtimeService) {}
+
+  private async ctx(actor: Actor, classId: string) {
+    const c = await this.prisma.class.findUnique({ where: { id: classId }, select: { id: true, status: true, teacher: { select: { userId: true } } } });
+    if (!c) throw new NotFoundException('Class not found');
+    if (c.teacher.userId === actor.id) return { classId, teacher: true, teacherUserId: c.teacher.userId, status: c.status };
+    if (actor.role === Role.STUDENT) {
+      const e = await this.prisma.classEnrollment.findFirst({ where: { classId, pupilId: actor.id, status: 'ACTIVE' }, select: { id: true } });
+      if (e) return { classId, teacher: false, teacherUserId: c.teacher.userId, status: c.status };
+    }
+    throw new NotFoundException('Class not found');
+  }
+
+  private async view(actor: Actor, teacherUserId: string, rows: { id: string; seq: number; authorId: string; body: string; fileId: string | null; createdAt: Date }[]) {
+    const authors = await this.prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.authorId))] } }, select: { id: true, name: true } });
+    const names = new Map(authors.map((a) => [a.id, a.name]));
+    const fileIds = rows.map((r) => r.fileId).filter((x): x is string => !!x);
+    const files = fileIds.length ? await this.prisma.storedFile.findMany({ where: { id: { in: fileIds } } }) : [];
+    const byId = new Map(files.map((f) => [f.id, f]));
+    return rows.map((r) => {
+      const f: StoredFile | undefined = r.fileId ? byId.get(r.fileId) : undefined;
+      const mime = f?.finalMime ?? f?.mime ?? '';
+      return {
+        id: r.id, seq: r.seq, at: r.createdAt, body: r.body, mine: r.authorId === actor.id,
+        author: { id: r.authorId, name: names.get(r.authorId) ?? null, teacher: r.authorId === teacherUserId },
+        file: f && !f.deletedAt ? { id: f.id, name: f.originalName, size: f.sizeBytes, mime, image: mime.startsWith('image/') } : null,
+      };
+    });
+  }
+
+  async list(actor: Actor, classId: string, opts: { before?: number; after?: number }) {
+    const c = await this.ctx(actor, classId);
+    const where = { classId, deletedAt: null, ...(opts.before ? { seq: { lt: opts.before } } : {}), ...(opts.after ? { seq: { gt: opts.after } } : {}) };
+    const rows = await this.prisma.classChannelPost.findMany({ where, orderBy: { seq: opts.after ? 'asc' : 'desc' }, take: PAGE });
+    if (!opts.after) rows.reverse();
+    return { items: await this.view(actor, c.teacherUserId, rows), more: rows.length === PAGE };
+  }
+
+  async post(actor: Actor, classId: string, input: { body?: string; fileId?: string }) {
+    const c = await this.ctx(actor, classId);
+    if (c.status !== 'ACTIVE') throw new ConflictException({ message: 'This class is closed', code: 'CLASS_CLOSED' });
+    const body = (input.body ?? '').trim();
+    if (!body && !input.fileId) throw new BadRequestException('Empty message');
+    if (body.length > CHANNEL_MAX_CHARS) throw new BadRequestException('Message too long');
+    if (body && detectContactInfo(body).found) {
+      const pupils = await this.prisma.classEnrollment.findMany({ where: { classId, status: 'ACTIVE' }, select: { pupil: { select: { dateOfBirth: true } } } });
+      const now = this.clock.now();
+      if (pupils.some((p) => !p.pupil.dateOfBirth || ageInYears(p.pupil.dateOfBirth, now) < ADULT_AGE)) throw new BadRequestException({ message: "For safety, contact details can't be shared in a class with pupils under 18", code: 'CONTACT_INFO_NOT_ALLOWED' });
+    }
+    if (input.fileId) {
+      const f = await this.prisma.storedFile.findFirst({ where: { id: input.fileId, ownerId: actor.id, deletedAt: null } });
+      if (!f) throw new NotFoundException('File not found');
+      if (f.purpose !== 'MESSAGE_ATTACHMENT') throw new BadRequestException('File has wrong purpose');
+      if (f.status !== 'READY') throw new ConflictException('File is not ready');
+      if (await this.prisma.classChannelPost.findUnique({ where: { fileId: f.id } })) throw new ConflictException('File already sent');
+    }
+    const row = await this.prisma.classChannelPost.create({ data: { classId, authorId: actor.id, body, fileId: input.fileId ?? null, createdAt: this.clock.now() } });
+    const [item] = await this.view(actor, c.teacherUserId, [row]);
+    const members = await this.prisma.classEnrollment.findMany({ where: { classId, status: 'ACTIVE' }, select: { pupilId: true } });
+    for (const u of [c.teacherUserId, ...members.map((m) => m.pupilId)]) if (u !== actor.id) this.realtime.emitToUser(u, 'class.channel', { classId, seq: row.seq });
+    return item;
+  }
+
+  async remove(actor: Actor, classId: string, postId: string) {
+    const c = await this.ctx(actor, classId);
+    const p = await this.prisma.classChannelPost.findFirst({ where: { id: postId, classId, deletedAt: null } });
+    if (!p) throw new NotFoundException('Message not found');
+    if (!c.teacher && p.authorId !== actor.id) throw new ForbiddenException('Forbidden');
+    await this.prisma.classChannelPost.update({ where: { id: p.id }, data: { deletedAt: this.clock.now() } });
+    return { ok: true };
+  }
+}

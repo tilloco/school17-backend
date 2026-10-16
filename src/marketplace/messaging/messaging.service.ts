@@ -198,7 +198,7 @@ export class MessagingService {
     // Real vaqtda yetkazish: ikkala ishtirokchi (yuboruvchining boshqa qurilmalari ham) + o'quvchining vasiylari (faqat o'qish)
     const watchers = [t.teacherUserId, t.studentUserId, ...(await this.guardians.guardianIdsOf(t.studentUserId))];
     for (const u of new Set(watchers)) this.realtime.emitToUser(u, 'message', { ...this.messageViewFor(u, fresh, msg) });
-    await this.notifications.enqueue(other, 'message.new', { threadId }, { dedupeKey: `msg:${threadId}:${this.clock.now().toISOString().slice(0, 13)}` });
+    await this.notifications.enqueue(other, 'message.new', { threadId }, { dedupeKey: `msg:${threadId}:${Math.floor(this.clock.now().getTime() / 300_000)}` });
     return this.messageView(actor, fresh, role, msg);
   }
 

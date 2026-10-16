@@ -212,7 +212,8 @@ export class FilesService {
     if (file.ownerId === actor.id) return true;
     if (file.purpose === 'MESSAGE_ATTACHMENT') {
       const m = await this.prisma.chatMessage.findUnique({ where: { fileId: file.id }, include: { thread: true } });
-      if (!m || m.deletedAt) return false;
+      if (!m) return this.canReadChannelFile(actor, file);
+      if (m.deletedAt) return false;
       if (m.thread.teacherUserId === actor.id || m.thread.studentUserId === actor.id) return true;
       if (actor.role === 'GUARDIAN' && (await this.guardians.isActiveGuardianOf(actor.id, m.thread.studentUserId))) return true;
     }
@@ -240,6 +241,15 @@ export class FilesService {
       if (actor.role === 'GUARDIAN' && (await this.guardians.isActiveGuardianOf(actor.id, b.studentId))) return true;
     }
     return false;
+  }
+
+  /** Sinf kanaliga yuborilgan fayl: sinf o'qituvchisi va faol a'zolar ko'radi. */
+  private async canReadChannelFile(actor: Actor, file: StoredFile): Promise<boolean> {
+    const post = await this.prisma.classChannelPost.findUnique({ where: { fileId: file.id } });
+    if (!post || post.deletedAt) return false;
+    const c = await this.prisma.class.findUnique({ where: { id: post.classId }, select: { teacher: { select: { userId: true } } } });
+    if (c?.teacher.userId === actor.id) return true;
+    return !!(await this.prisma.classEnrollment.findFirst({ where: { classId: post.classId, pupilId: actor.id, status: 'ACTIVE' }, select: { id: true } }));
   }
 
   async downloadUrl(actor: Actor, fileId: string, variant: 'original' | 'thumb', adminOverride = false) {

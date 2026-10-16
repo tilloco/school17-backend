@@ -25,7 +25,7 @@ export function marketConfig() {
     presentMinSeconds: int('CALL_PRESENT_MIN_SECONDS', 60), // shuncha turgan tomon "keldi" hisoblanadi
     presenceStaleSeconds: int('CALL_PRESENCE_STALE_SECONDS', 45),
     // Sinflar (R1)
-    classMaxPupils: int('CLASS_MAX_PUPILS', 30), // bir sinfdagi o'quvchilar soni chegarasi (o'qituvchi capacity'ni 1..shu oraliqda tanlaydi)
+    classMaxPupils: int('CLASS_MAX_PUPILS', 500), // bir sinfdagi o'quvchilar soni chegarasi (o'qituvchi capacity'ni 1..shu oraliqda tanlaydi)
     classMaxStagePupils: int('CLASS_MAX_STAGE_PUPILS', 10), // bir vaqtda sahnadagi o'quvchilar (R2)
     classJoinAttemptsPerHour: int('CLASS_JOIN_ATTEMPTS_PER_HOUR', 10), // kod/havola bilan qo'shilish urinishlari, bir foydalanuvchiga
     classLobbyMinutes: int('CLASS_LOBBY_MINUTES', 10), // kutish xonasi darsdan necha daqiqa oldin ochiladi

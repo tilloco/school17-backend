@@ -5,11 +5,13 @@ import { Actor } from '../common/actor';
 import { CurrentActor, RequirePermission, UserActorGuard } from '../common/actor.guard';
 import { ClassesService } from './classes.service';
 
+class AddSessionDto { @IsString() @MaxLength(40) startAt!: string; @IsOptional() @IsInt() durationMin?: number; }
+
 class ClassDto {
   @IsString() @MinLength(2) @MaxLength(100) title!: string;
   @IsString() @MinLength(2) @MaxLength(60) subject!: string;
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
-  @IsInt() capacity!: number;
+  @IsOptional() @IsInt() capacity?: number;
   @IsOptional() @IsInt() priceMinor?: number;
   @IsOptional() @IsIn(['PER_SESSION', 'MONTHLY']) priceModel?: 'PER_SESSION' | 'MONTHLY';
   @IsOptional() @IsArray() @IsInt({ each: true }) weekdays?: number[];
@@ -82,6 +84,9 @@ export class ClassesController {
 
   @Get(':id/sessions') @RequirePermission('class.read')
   sessions(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Query('from') from?: string, @Query('to') to?: string) { return this.classes.sessions(a, id, from, to); }
+
+  @Post(':id/sessions') @HttpCode(201) @RequirePermission('class.manage')
+  addSession(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AddSessionDto) { return this.classes.addSession(a, id, dto); }
 
   @Post(':id/sessions/:sessionId/cancel') @HttpCode(200) @RequirePermission('class.manage')
   cancelSession(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('sessionId', ParseUUIDPipe) sid: string) { return this.classes.cancelSession(a, id, sid); }
