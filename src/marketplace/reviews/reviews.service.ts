@@ -39,10 +39,45 @@ export class ReviewsService {
     return this.ownView(review);
   }
 
+  /**
+   * Sinf sharhi: faqat shu sinfga yozilgan (yozgan) kishi, sinfda kamida 2 ta TUGAGAN darsda qatnashgan bo'lsa. Har sinfga bittadan.
+   * Shunday qilib baho "haqiqiy": o'qituvchi yoki do'sti soxta baho qo'sha olmaydi.
+   */
+  async createForClass(actor: Actor, classId: string, input: { rating: number; text?: string }) {
+    const e = await this.prisma.classEnrollment.findFirst({ where: { classId, enrolledById: actor.id }, include: { class: { include: { teacher: { select: { id: true, userId: true } } } } } });
+    if (!e || e.class.teacher.userId === actor.id) throw new NotFoundException('Not found');
+    if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) throw new BadRequestException('Rating must be 1..5');
+    const attended = await this.prisma.classAttendance.count({ where: { pupilId: e.pupilId, session: { classId, status: 'ENDED', teacherNoShow: false } } });
+    if (attended < 2) throw new ConflictException({ message: 'Attend at least 2 lessons of this class first', code: 'NOT_ENOUGH_LESSONS', attended });
+    const now = this.clock.now();
+    let review: Review;
+    try {
+      review = await this.prisma.review.create({ data: { classId, teacherId: e.class.teacher.id, authorId: actor.id, rating: input.rating, text: clean(input.text, 1000), createdAt: now } });
+    } catch (err: any) {
+      if (err?.code === 'P2002') throw new ConflictException({ message: 'Already reviewed', code: 'ALREADY_REVIEWED' });
+      throw err;
+    }
+    await this.recompute(e.class.teacher.id);
+    await this.audit.log(actor, { action: 'review.create', targetType: 'Review', targetId: review.id, metadata: { rating: input.rating, classId } });
+    await this.notifications.enqueue(e.class.teacher.userId, 'review.new', { reviewId: review.id });
+    return this.ownView(review);
+  }
+
+  /** Sinf sharhi mumkinmi: kamida 2 ta tugagan dars va hali sharh yo'q. */
+  async classReviewState(actor: Actor, classId: string) {
+    const e = await this.prisma.classEnrollment.findFirst({ where: { classId, enrolledById: actor.id } });
+    if (!e) throw new NotFoundException('Not found');
+    const [attended, mine] = await Promise.all([
+      this.prisma.classAttendance.count({ where: { pupilId: e.pupilId, session: { classId, status: 'ENDED', teacherNoShow: false } } }),
+      this.prisma.review.findFirst({ where: { classId, authorId: actor.id } }),
+    ]);
+    return { attended, canReview: attended >= 2 && !mine, review: mine ? this.ownView(mine) : null };
+  }
+
   async update(actor: Actor, reviewId: string, input: { rating?: number; text?: string }) {
     const r = await this.prisma.review.findFirst({ where: { id: reviewId, authorId: actor.id } });
     if (!r) throw new NotFoundException('Not found');
-    if (r.status === 'HIDDEN') throw new ConflictException('Review is hidden');
+    if (r.status === 'HIDDEN' || r.textHidden) throw new ConflictException('Review is hidden');
     if (this.clock.now().getTime() - r.createdAt.getTime() > marketConfig().reviewEditHours * 3_600_000) throw new ConflictException({ message: 'Edit window closed', code: 'EDIT_WINDOW_CLOSED' });
     if (input.rating !== undefined && (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5)) throw new BadRequestException('Rating must be 1..5');
     const updated = await this.prisma.review.update({
@@ -57,7 +92,7 @@ export class ReviewsService {
   async reply(actor: Actor, reviewId: string, text: string) {
     const r = await this.prisma.review.findUnique({ where: { id: reviewId }, include: { teacher: { select: { userId: true } } } });
     if (!r || r.teacher.userId !== actor.id) throw new NotFoundException('Not found');
-    if (r.status !== 'VISIBLE') throw new ConflictException('Review is hidden');
+    if (r.status !== 'VISIBLE' || r.textHidden) throw new ConflictException('Review is hidden');
     const body = clean(text, 1000);
     if (!body) throw new BadRequestException('Empty reply');
     if (r.repliedAt && this.clock.now().getTime() - r.repliedAt.getTime() > marketConfig().reviewEditHours * 3_600_000) throw new ConflictException({ message: 'Reply is locked', code: 'REPLY_LOCKED' });
@@ -78,9 +113,9 @@ export class ReviewsService {
     return {
       summary: { count: p.ratingCount, average: p.ratingCount ? Math.round((p.ratingSum / p.ratingCount) * 100) / 100 : null, bayesian: Math.round(p.ratingBayes * 100) / 100, distribution: Object.fromEntries([1, 2, 3, 4, 5].map((n) => [n, dist.find((d) => d.rating === n)?._count._all ?? 0])) },
       items: rows.map((r) => ({
-        id: r.id, rating: r.rating, text: r.text, createdAt: r.createdAt, edited: !!r.editedAt,
+        id: r.id, rating: r.rating, text: r.textHidden ? '' : r.text, textHidden: r.textHidden, createdAt: r.createdAt, edited: !!r.editedAt,
         author: displayName(r.author.name, true), // faqat "Ism F."
-        reply: r.teacherReply ? { text: r.teacherReply, at: r.repliedAt } : null,
+        reply: r.teacherReply && !r.textHidden ? { text: r.teacherReply, at: r.repliedAt } : null,
       })),
     };
   }
@@ -106,7 +141,8 @@ export class ReviewsService {
     if (admin.kind !== 'admin') throw new ForbiddenException('Forbidden');
     const r = await this.prisma.review.findUnique({ where: { id: reviewId } });
     if (!r) throw new NotFoundException('Not found');
-    await this.prisma.review.update({ where: { id: r.id }, data: { status: hidden ? 'HIDDEN' : 'VISIBLE', hiddenReason: hidden ? (reason ?? '').slice(0, 300) : null } });
+    // Yulduz baho HECH QACHON yashirilmaydi (admin ham, o'qituvchi ham yashira olmaydi): faqat MATN yashiriladi, baho hisobda qoladi.
+    await this.prisma.review.update({ where: { id: r.id }, data: { textHidden: hidden, hiddenReason: hidden ? (reason ?? '').slice(0, 300) : null } });
     await this.recompute(r.teacherId);
     await this.audit.log(admin, { action: hidden ? 'review.hide' : 'review.restore', targetType: 'Review', targetId: r.id, metadata: { reason } });
   }

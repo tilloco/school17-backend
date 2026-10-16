@@ -70,9 +70,15 @@ export class ReportsService {
 
   private async assertReportable(actor: Actor, type: ReportTargetType, id: string) {
     if (type === 'REVIEW') {
-      const r = await this.prisma.review.findFirst({ where: { id, status: 'VISIBLE' }, include: { teacher: { select: { verificationStatus: true } } } });
+      const r = await this.prisma.review.findFirst({ where: { id, status: 'VISIBLE', textHidden: false }, include: { teacher: { select: { verificationStatus: true } } } });
       if (!r || r.teacher.verificationStatus !== 'VERIFIED') throw new NotFoundException('Not found');
       if (r.authorId === actor.id) throw new ForbiddenException('You cannot report your own review');
+      return;
+    }
+    if (type === 'COMMENT') {
+      const c = await this.prisma.teacherComment.findFirst({ where: { id, hidden: false } });
+      if (!c) throw new NotFoundException('Not found');
+      if (c.authorId === actor.id) throw new ForbiddenException('You cannot report your own comment');
       return;
     }
     throw new BadRequestException('Unsupported target type');
@@ -93,6 +99,10 @@ export class ReportsService {
     if (type === 'REVIEW') {
       const r = await this.prisma.review.findUnique({ where: { id } });
       return r ? { rating: r.rating, text: r.text, status: r.status, reply: r.teacherReply, teacherId: r.teacherId } : null;
+    }
+    if (type === 'COMMENT') {
+      const c = await this.prisma.teacherComment.findUnique({ where: { id } });
+      return c ? { text: c.text, hidden: c.hidden, teacherId: c.teacherId } : null;
     }
     return null;
   }
@@ -116,6 +126,7 @@ export class ReportsService {
     if (r.status !== 'OPEN') throw new ConflictException('Report already resolved');
     if (action === 'ACTION') {
       if (r.targetType === 'REVIEW') await this.reviews.setHidden(admin, r.targetId, true, note ?? `report:${r.reason}`);
+      else if (r.targetType === 'COMMENT') await this.prisma.teacherComment.updateMany({ where: { id: r.targetId }, data: { hidden: true } });
       else if (r.targetType === 'MESSAGE') {
         await this.prisma.chatMessage.updateMany({ where: { id: r.targetId }, data: { deletedAt: this.clock.now() } });
         await this.prisma.classMessage.updateMany({ where: { id: r.targetId, deletedAt: null }, data: { deletedAt: this.clock.now() } }); // sinf chati (R3)

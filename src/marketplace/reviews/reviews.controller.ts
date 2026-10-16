@@ -40,6 +40,12 @@ export class ReviewsController {
   @Post('bookings/:bookingId/review') @RequirePermission('review.create')
   create(@CurrentActor() a: Actor, @Param('bookingId', ParseUUIDPipe) id: string, @Body() dto: CreateReviewDto) { return this.reviews.create(a, id, dto); }
 
+  @Get('classes/:classId/review') @RequirePermission('review.create')
+  classReview(@CurrentActor() a: Actor, @Param('classId', ParseUUIDPipe) classId: string) { return this.reviews.classReviewState(a, classId); }
+
+  @Post('classes/:classId/review') @RequirePermission('review.create')
+  createClassReview(@CurrentActor() a: Actor, @Param('classId', ParseUUIDPipe) classId: string, @Body() dto: CreateReviewDto) { return this.reviews.createForClass(a, classId, dto); }
+
   @Put('reviews/:id') @RequirePermission('review.create')
   update(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateReviewDto) { return this.reviews.update(a, id, dto); }
 

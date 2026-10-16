@@ -125,11 +125,11 @@ describe('reviews (integration)', () => {
     assert.equal(p.ratingSum, 13);
     assert.ok(Math.abs(p.ratingBayes - bayesianAverage(13, 3, 4.2, 5)) < 1e-9);
     assert.ok(p.ratingBayes < 13 / 3, 'shrunk below the raw 4.33 average? prior 4.2 pulls toward 4.2');
-    // admin yashirsa agregat qayta hisoblanadi
+    // admin faqat MATNni yashiradi: yulduz baho hisobda qoladi
     await api(t, admin.token).post(`/admin/market/reviews/${ids[2]}/hide`, { reason: 'abusive' });
     p = await t.prisma.teacherProfile.findUniqueOrThrow({ where: { id: tch.profileId } });
-    assert.equal(p.ratingCount, 2);
-    assert.equal(p.ratingSum, 10);
+    assert.equal(p.ratingCount, 3);
+    assert.equal(p.ratingSum, 13);
     await api(t, admin.token).post(`/admin/market/reviews/${ids[2]}/restore`);
     assert.equal((await t.prisma.teacherProfile.findUniqueOrThrow({ where: { id: tch.profileId } })).ratingCount, 3);
     // jamoat ro'yxati
@@ -206,13 +206,15 @@ describe('reviews (integration)', () => {
     assert.equal((await api(t, x.tch.user.token).get('/admin/market/reports')).status, 401, 'teachers cannot see the queue');
     const res = await api(t, admin.token).post(`/admin/market/reports/${rep.body.id}/resolve`, { action: 'ACTION', note: 'phone number' });
     assert.equal(res.body.status, 'ACTIONED');
-    assert.equal((await t.prisma.review.findUniqueOrThrow({ where: { id: r.id } })).status, 'HIDDEN');
-    assert.equal((await t.prisma.teacherProfile.findUniqueOrThrow({ where: { id: x.tch.profileId } })).ratingCount, 0);
+    assert.equal((await t.prisma.review.findUniqueOrThrow({ where: { id: r.id } })).textHidden, true);
+    assert.equal((await t.prisma.teacherProfile.findUniqueOrThrow({ where: { id: x.tch.profileId } })).ratingCount, 1, 'the star still counts');
     assert.equal((await api(t, admin.token).post(`/admin/market/reports/${rep.body.id}/resolve`, { action: 'DISMISS' })).status, 409);
     assert.ok(await t.prisma.auditLog.findFirst({ where: { action: 'report.action', actorType: 'ADMIN' } }));
     // hidden reviews can no longer be reported and disappear from the public list
     assert.equal((await api(t, x.tch.user.token).post(`/reviews/${r.id}/report`, { reason: 'SPAM' })).status, 404);
-    assert.equal((await api(t, x.student.token).get(`/teachers/${x.tch.profileId}/reviews`)).body.items.length, 0);
+    const shown = (await api(t, x.student.token).get(`/teachers/${x.tch.profileId}/reviews`)).body.items;
+    assert.equal(shown.length, 1);
+    assert.equal(shown[0].text, '');
 
     const y = await completed({ teacher: x.tch });
     const r2 = (await review(y.student, y.bookingId, 5)).body;

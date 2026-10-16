@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { OnboardingModule } from './onboarding/onboarding.module';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ActorThrottlerGuard } from './marketplace/common/actor-throttler.guard';
@@ -7,15 +6,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
-import { ContentModule } from './content/content.module';
-import { QuizModule } from './quiz/quiz.module';
-import { PremiumModule } from './premium/premium.module';
-import { ReferralModule } from './referral/referral.module';
-import { PaymentsModule } from './payments/payments.module';
-import { AiModule } from './ai/ai.module';
 import { AdminAuthModule } from './admin-auth/admin-auth.module';
-import { AdminModule } from './admin/admin.module';
-import { ExamModule } from './exam/exam.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 
 @Module({
@@ -34,16 +25,7 @@ import { MarketplaceModule } from './marketplace/marketplace.module';
     PrismaModule,
     AuthModule,
     UsersModule,
-    ContentModule,
-    QuizModule,
-    PremiumModule,
-    ReferralModule,
-    PaymentsModule,
-    AiModule,
     AdminAuthModule,
-    AdminModule,
-    OnboardingModule,
-    ExamModule,
     MarketplaceModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ActorThrottlerGuard }],

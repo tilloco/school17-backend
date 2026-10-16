@@ -7,6 +7,7 @@ import { ReportReason } from '@prisma/client';
 import { IsEnum } from 'class-validator';
 import { ReportsService } from '../moderation/reports.service';
 import { MessagingService } from './messaging.service';
+import { DirectService } from './direct.service';
 
 class ThreadReportDto {
   @IsEnum(ReportReason) reason!: ReportReason;
@@ -15,6 +16,9 @@ class ThreadReportDto {
 
 class OpenDto {
   @IsUUID() bookingId!: string;
+}
+class DirectDto {
+  @IsUUID() userId!: string;
 }
 class SendDto {
   @IsOptional() @IsString() @MaxLength(2000) body?: string;
@@ -27,7 +31,7 @@ class SeqDto {
 @Controller('threads')
 @UseGuards(UserActorGuard)
 export class MessagingController {
-  constructor(private messaging: MessagingService, private reports: ReportsService) {}
+  constructor(private messaging: MessagingService, private reports: ReportsService, private direct: DirectService) {}
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post(':id/report') @HttpCode(201) @RequirePermission('report.create')
@@ -39,6 +43,23 @@ export class MessagingController {
 
   @Post() @HttpCode(200) @RequirePermission('message.send')
   open(@CurrentActor() a: Actor, @Body() dto: OpenDto) { return this.messaging.openFromBooking(a, dto.bookingId); }
+
+  /** Bron bo'lmasa ham: sinfdosh / o'qituvchi (darrov) yoki @nom bilan topilgan kattalar (so'rov). */
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Post('direct') @HttpCode(200) @RequirePermission('message.send')
+  openDirect(@CurrentActor() a: Actor, @Body() dto: DirectDto) { return this.direct.open(a, dto.userId); }
+
+  @Get('people') @RequirePermission('message.send')
+  people(@CurrentActor() a: Actor, @Query('q') q?: string) { return this.direct.search(a, q ?? ''); }
+
+  @Get('contacts') @RequirePermission('message.send')
+  contacts(@CurrentActor() a: Actor) { return this.direct.contacts(a); }
+
+  @Post(':id/accept') @HttpCode(200) @RequirePermission('message.send')
+  accept(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.messaging.answerRequest(a, id, true); }
+
+  @Post(':id/decline') @HttpCode(200) @RequirePermission('message.send')
+  decline(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.messaging.answerRequest(a, id, false); }
 
   @Get() @RequirePermission('message.send')
   list(@CurrentActor() a: Actor) { return this.messaging.list(a); }

@@ -96,6 +96,7 @@ model User {
   emailVerifiedAt         DateTime? // Google tasdiqlagan e-pochta; parol bilan ro'yxatdan o'tganda bo'sh (tasdiqlanmagan)
   loginFailCount          Int                @default(0)
   lockedUntil             DateTime?
+  avatarFileId            String? // profil rasmi (StoredFile AVATAR); o'qituvchida TeacherProfile.photoFileId bilan bir xil
   username                String?            @unique // @nom: kichik harf, raqam, pastki chiziq; qidiruvda ishlatiladi
   phone                   String?            @unique // E.164, Telegram kod orqali tasdiqlangan; boshqalarga ko'rsatilmaydi
   dailyStudyMinutes       Int?
@@ -812,6 +813,8 @@ model ChatThread {
   studentLastReadSeq  Int           @default(0)
   teacherDeliveredSeq Int           @default(0)
   studentDeliveredSeq Int           @default(0)
+  status              ThreadStatus  @default(ACTIVE) // REQUEST: tanish bo'lmagan odamdan birinchi xabar, qabul qilinguncha bitta xabar
+  requestedById       String?
   createdAt           DateTime      @default(now())
   messages            ChatMessage[]
 
@@ -845,8 +848,10 @@ enum ReviewStatus {
 
 model Review {
   id           String         @id @default(uuid())
-  bookingId    String         @unique
-  booking      Booking        @relation("BookingReview", fields: [bookingId], references: [id], onDelete: Restrict)
+  bookingId    String?        @unique // 1:1 dars sharhi; sinf sharhida bo'sh
+  booking      Booking?       @relation("BookingReview", fields: [bookingId], references: [id], onDelete: Restrict)
+  classId      String? // sinf sharhi: yozilgan va kamida 2 ta tugagan darsda qatnashgan o'quvchi, har sinfga bittadan
+  textHidden   Boolean        @default(false) // admin faqat MATNni yashira oladi; yulduz baho hisobda qoladi
   teacherId    String // TeacherProfile.id
   teacher      TeacherProfile @relation("TeacherReviews", fields: [teacherId], references: [id], onDelete: Restrict)
   authorId     String
@@ -860,6 +865,7 @@ model Review {
   editedAt     DateTime?
   createdAt    DateTime       @default(now())
 
+  @@unique([classId, authorId])
   @@index([teacherId, status, createdAt])
   @@index([authorId])
 }
@@ -1574,4 +1580,10 @@ model TeacherComment {
 
   @@unique([teacherId, authorId])
   @@index([teacherId, hidden, createdAt])
+}
+
+enum ThreadStatus {
+  ACTIVE
+  REQUEST
+  DECLINED
 }

@@ -36,6 +36,7 @@ export class AccountService {
       email: u.email,
       name: u.name,
       username: u.username,
+      hasPhoto: !!u.avatarFileId,
       role: u.role,
       locale: u.locale,
       timezone: u.timezone,

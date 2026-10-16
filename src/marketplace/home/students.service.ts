@@ -29,9 +29,9 @@ export class StudentsService {
     const [bookings, enrollments, homework, classPays, sessions] = await Promise.all([
       this.prisma.booking.findMany({
         where: { teacherId, status: { in: ['REQUESTED', 'CONFIRMED', 'COMPLETED', 'NO_SHOW_STUDENT'] } }, orderBy: { startAt: 'desc' }, take: 3000,
-        select: { id: true, studentId: true, status: true, startAt: true, createdAt: true, isTrial: true, priceMinor: true, student: { select: { name: true, dateOfBirth: true } }, directPayment: { select: { status: true, amountMinor: true } } },
+        select: { id: true, studentId: true, status: true, startAt: true, createdAt: true, isTrial: true, priceMinor: true, student: { select: { name: true, dateOfBirth: true, avatarFileId: true } }, directPayment: { select: { status: true, amountMinor: true } } },
       }),
-      this.prisma.classEnrollment.findMany({ where: { status: 'ACTIVE', class: { teacherId, status: 'ACTIVE' } }, take: 3000, select: { pupilId: true, createdAt: true, class: { select: { id: true, title: true } }, pupil: { select: { name: true, dateOfBirth: true } } } }),
+      this.prisma.classEnrollment.findMany({ where: { status: 'ACTIVE', class: { teacherId, status: 'ACTIVE' } }, take: 3000, select: { pupilId: true, createdAt: true, class: { select: { id: true, title: true } }, pupil: { select: { name: true, dateOfBirth: true, avatarFileId: true } } } }),
       this.prisma.classHomework.findMany({ where: { class: { teacherId } }, take: 1000, select: { id: true, classId: true, submissions: { select: { pupilId: true, score: true, markedAt: true } } } }),
       this.prisma.classPayment.findMany({ where: { class: { teacherId }, status: { in: OWED } }, take: 3000, select: { pupilId: true, amountMinor: true } }),
       this.prisma.classSession.findMany({ where: { class: { teacherId, status: 'ACTIVE' }, startAt: { gt: new Date(now.getTime() - 3_600_000) }, status: { in: ['SCHEDULED', 'LOBBY', 'LIVE'] } }, orderBy: { startAt: 'asc' }, take: 500, select: { classId: true, startAt: true } }),
@@ -39,12 +39,12 @@ export class StudentsService {
     const nextByClass = new Map<string, Date>();
     for (const s of sessions) if (!nextByClass.has(s.classId)) nextByClass.set(s.classId, s.startAt);
 
-    interface Row { pupilId: string; name: string; minor: boolean; since: Date | null; lessons: number; nextAt: Date | null; lastAt: Date | null; classes: { id: string; title: string }[]; chatBookingId: string | null; owedCount: number; owedMinor: number; hwAssigned: number; hwSubmitted: number; hwToMark: number; scores: number[] }
+    interface Row { pupilId: string; hasPhoto: boolean; name: string; minor: boolean; since: Date | null; lessons: number; nextAt: Date | null; lastAt: Date | null; classes: { id: string; title: string }[]; chatBookingId: string | null; owedCount: number; owedMinor: number; hwAssigned: number; hwSubmitted: number; hwToMark: number; scores: number[] }
     const rows = new Map<string, Row>();
-    const row = (id: string, u: { name: string | null; dateOfBirth: Date | null }): Row => {
+    const row = (id: string, u: { name: string | null; dateOfBirth: Date | null; avatarFileId?: string | null }): Row => {
       let r = rows.get(id);
       if (!r) {
-        r = { pupilId: id, ...this.nameOf(u, now), since: null, lessons: 0, nextAt: null, lastAt: null, classes: [], chatBookingId: null, owedCount: 0, owedMinor: 0, hwAssigned: 0, hwSubmitted: 0, hwToMark: 0, scores: [] };
+        r = { pupilId: id, hasPhoto: !!u.avatarFileId, ...this.nameOf(u, now), since: null, lessons: 0, nextAt: null, lastAt: null, classes: [], chatBookingId: null, owedCount: 0, owedMinor: 0, hwAssigned: 0, hwSubmitted: 0, hwToMark: 0, scores: [] };
         rows.set(id, r);
       }
       return r;
@@ -92,7 +92,7 @@ export class StudentsService {
     }
     return [...rows.values()]
       .map((r) => ({
-        pupilId: r.pupilId, name: r.name, minor: r.minor, since: r.since, lessonsCompleted: r.lessons, nextAt: r.nextAt, lastLessonAt: r.lastAt, classes: r.classes, chatBookingId: r.chatBookingId,
+        pupilId: r.pupilId, hasPhoto: r.hasPhoto, name: r.name, minor: r.minor, since: r.since, lessonsCompleted: r.lessons, nextAt: r.nextAt, lastLessonAt: r.lastAt, classes: r.classes, chatBookingId: r.chatBookingId,
         homework: { assigned: r.hwAssigned, submitted: r.hwSubmitted, toMark: r.hwToMark, avgScore: r.scores.length ? Math.round(r.scores.reduce((a, b) => a + b, 0) / r.scores.length) : null },
         payment: { owedCount: r.owedCount, owedMinor: r.owedMinor },
         attention: r.owedCount > 0 || r.hwToMark > 0 || (r.lastAt !== null && now.getTime() - r.lastAt.getTime() > 30 * DAY && !r.nextAt),

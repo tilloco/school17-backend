@@ -45,6 +45,9 @@ import { HomeController } from './home/home.controller';
 import { NetCheckController } from './classes/netcheck.controller';
 import { ClassChatService } from './classes/class-chat.service';
 import { ClassChatController } from './classes/class-chat.controller';
+import { DirectService } from './messaging/direct.service';
+import { AvatarsService } from './account/avatars.service';
+import { AvatarsController } from './account/avatars.controller';
 import { CommentsService } from './reviews/comments.service';
 import { CommentsController } from './reviews/comments.controller';
 import { ClassChannelService } from './classes/class-channel.service';
@@ -78,13 +81,15 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     JwtModule.registerAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (c: ConfigService) => ({ secret: c.get<string>('JWT_SECRET') }) }),
   ],
   // Tartib muhim: 'teachers/me' controller'i 'teachers/:id' dan oldin turishi kerak
-  controllers: [HomeController, ClassPollController, ClassFeedController, ClassPaymentsController, ClassBoardController, ClassFilesController, ClassPresentController, ClassFilesAdminController, NetCheckController, ClassesController, ClassRoomController, ClassChatController, ClassChannelController, CommentsController, DirectPaymentController, TeacherMoneyController, MyDirectPaymentsController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
+  controllers: [HomeController, ClassPollController, ClassFeedController, ClassPaymentsController, ClassBoardController, ClassFilesController, ClassPresentController, ClassFilesAdminController, NetCheckController, ClassesController, ClassRoomController, ClassChatController, ClassChannelController, CommentsController, AvatarsController, DirectPaymentController, TeacherMoneyController, MyDirectPaymentsController, PaymentInfoMeController, PaymentInfoRevealController, NotificationsController, GuardianController, BlocksController, ConsentsController, PublicLegalController, AccountController, AuditController, DiscoveryController, ReviewsController, ModerationAdminController, PaymentsController, PaymentsAdminController, TeachersMeController, TeachersPublicController, TeachersAdminController, BookingController, CallsController, CallsWebhookController, CallsAdminController, MessagingController, FilesController, FilesStorageController, FilesAdminController],
   providers: [
     ClassesService,
     ClassRoomService,
     ClassChatService,
     ClassChannelService,
     CommentsService,
+    DirectService,
+    AvatarsService,
     ClassFilesService,
     ClassBoardService,
     ClassPaymentsService,

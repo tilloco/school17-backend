@@ -20,8 +20,8 @@ export type MessageState = 'SENT' | 'DELIVERED' | 'READ';
 type Side = 'TEACHER' | 'STUDENT';
 
 type ThreadFull = ChatThread & {
-  teacher: { name: string | null };
-  student: { name: string | null; dateOfBirth: Date | null; status: string };
+  teacher: { name: string | null; avatarFileId: string | null };
+  student: { name: string | null; dateOfBirth: Date | null; status: string; avatarFileId: string | null };
 };
 type MessageFull = ChatMessage & { file: StoredFile | null };
 
@@ -56,10 +56,18 @@ export class MessagingService {
     return this.threadView(actor, await this.loadThread(thread.id));
   }
 
+  /** So'rovni qabul qilish / rad etish (faqat so'rov yuborilgan odam). */
+  async answerRequest(actor: Actor, threadId: string, accept: boolean) {
+    const { t } = await this.mustSee(actor, threadId);
+    if (t.status !== 'REQUEST' || t.requestedById === actor.id || (t.teacherUserId !== actor.id && t.studentUserId !== actor.id)) throw new ConflictException('Nothing to answer');
+    await this.prisma.chatThread.update({ where: { id: t.id }, data: { status: accept ? 'ACTIVE' : 'DECLINED' } });
+    return this.threadView(actor, await this.loadThread(t.id));
+  }
+
   private async loadThread(id: string): Promise<ThreadFull> {
     return (await this.prisma.chatThread.findUniqueOrThrow({
       where: { id },
-      include: { teacher: { select: { name: true } }, student: { select: { name: true, dateOfBirth: true, status: true } } },
+      include: { teacher: { select: { name: true, avatarFileId: true } }, student: { select: { name: true, dateOfBirth: true, status: true, avatarFileId: true } } },
     })) as ThreadFull;
   }
 
@@ -82,9 +90,9 @@ export class MessagingService {
   async list(actor: Actor) {
     const linked = actor.role === Role.GUARDIAN ? await this.guardians.linkedStudentIds(actor.id) : [];
     const rows = (await this.prisma.chatThread.findMany({
-      where: { OR: [{ teacherUserId: actor.id }, { studentUserId: actor.id }, ...(linked.length ? [{ studentUserId: { in: linked } }] : [])] },
+      where: { OR: [{ teacherUserId: actor.id }, { studentUserId: actor.id }, ...(linked.length ? [{ studentUserId: { in: linked } }] : [])], NOT: { status: 'DECLINED', requestedById: { not: actor.id } } },
       orderBy: [{ lastMessageAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
-      include: { teacher: { select: { name: true } }, student: { select: { name: true, dateOfBirth: true, status: true } } },
+      include: { teacher: { select: { name: true, avatarFileId: true } }, student: { select: { name: true, dateOfBirth: true, status: true, avatarFileId: true } } },
       take: 200,
     })) as ThreadFull[];
     return Promise.all(rows.map((t) => this.threadView(actor, t)));
@@ -100,7 +108,11 @@ export class MessagingService {
       id: t.id,
       myRole: role,
       // O'qituvchi o'quvchining faqat ko'rinadigan ismini ko'radi (voyaga yetmaganlar: "Ism F."); hech qanday kontakt ma'lumoti yo'q
-      other: role === 'TEACHER' ? { name: displayName(t.student.name, minor) } : { name: t.teacher.name },
+      other: role === 'TEACHER'
+        ? (minor ? { name: displayName(t.student.name, minor) } : { id: t.studentUserId, name: displayName(t.student.name, minor), hasPhoto: !!t.student.avatarFileId }) // a minor's id and photo are never sent to the other side
+        : { id: t.teacherUserId, name: t.teacher.name, hasPhoto: !!t.teacher.avatarFileId },
+      status: t.status,
+      requestedByMe: t.requestedById === actor.id,
       pupil: role === 'GUARDIAN' ? { name: t.student.name } : undefined,
       lastMessage: last ? { preview: last.body ? last.body.slice(0, 80) : last.fileId ? '📎' : '', at: last.createdAt, mine: last.senderId === actor.id } : null,
       unread,
@@ -152,6 +164,12 @@ export class MessagingService {
   async send(actor: Actor, threadId: string, input: { body?: string; fileId?: string }) {
     const { t, role } = await this.mustSee(actor, threadId);
     if (role === 'GUARDIAN') throw new ForbiddenException('Guardians have read-only access');
+    // Xabar so'rovi: tanish bo'lmagan odamga javob berilguncha faqat bitta xabar; javob yozish so'rovni qabul qilish hisoblanadi.
+    if (t.status === 'DECLINED') throw new ForbiddenException({ message: 'This person did not accept your message request', code: 'DECLINED' });
+    if (t.status === 'REQUEST') {
+      if (t.requestedById !== actor.id) await this.prisma.chatThread.update({ where: { id: t.id }, data: { status: 'ACTIVE' } });
+      else if ((await this.prisma.chatMessage.count({ where: { threadId, senderId: actor.id } })) >= 1) throw new ConflictException({ message: 'Wait until they accept your message request', code: 'REQUEST_PENDING' });
+    }
     const body = (input.body ?? '').trim();
     if (!body && !input.fileId) throw new BadRequestException('Empty message');
     if (body.length > MAX_MESSAGE_LENGTH) throw new BadRequestException('Message too long');

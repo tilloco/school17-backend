@@ -121,12 +121,14 @@ export class TeachersService {
     if (f.purpose !== 'AVATAR') throw new BadRequestException('File has wrong purpose');
     if (f.status !== 'READY' || !f.thumbKey) throw new ConflictException('File is not a ready image');
     await this.prisma.teacherProfile.update({ where: { id: p.id }, data: { photoFileId: f.id } });
+    await this.prisma.user.update({ where: { id: actor.id }, data: { avatarFileId: f.id } });
     return { hasPhoto: true };
   }
 
   async removePhoto(actor: Actor) {
     const p = await this.ownProfileOrThrow(actor);
     await this.prisma.teacherProfile.update({ where: { id: p.id }, data: { photoFileId: null } });
+    await this.prisma.user.update({ where: { id: actor.id }, data: { avatarFileId: null } });
     return { hasPhoto: false };
   }
 
