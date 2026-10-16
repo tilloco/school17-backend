@@ -170,4 +170,26 @@ describe('direct messages, avatars, class reviews and comment reports (integrati
     assert.equal((await api(t, admin.token).post(`/admin/market/reports/${rep.body.id}/resolve`, { action: 'ACTION' })).body.status, 'ACTIONED');
     assert.equal((await api(t, reader.token).get(base)).body.items.length, 0);
   });
+
+  it('profile card: classmates see name, @username and bio; strangers only name and @username; minors are hidden from classmates; the bio cannot hold a phone number or a link', async () => {
+    const a = await named(Role.STUDENT, 'cardA', { name: 'Aziz Tursunov' });
+    const mate = await makeUser(t, Role.STUDENT);
+    const stranger = await named(Role.STUDENT, 'cardS');
+    const kid = await named(Role.STUDENT, 'cardK', { dateOfBirth: '2012-05-05', name: 'Kid Karimov' });
+    const { x, c } = await classWith(a, mate);
+    const g = await makeUser(t, Role.GUARDIAN);
+    await t.prisma.guardianLink.create({ data: { guardianId: g.id, studentId: kid.id, status: 'ACTIVE' } });
+    assert.equal((await api(t, g.token).post('/classes/join', { code: c.joinCode, studentId: kid.id })).status, 200);
+    assert.equal((await api(t, a.token).patch('/me', { bio: 'Preparing for IELTS. I like math and chess.' })).status, 200);
+    assert.equal((await api(t, a.token).patch('/me', { bio: 'Call me +998 90 123 45 67' })).status, 400);
+    assert.equal((await api(t, a.token).patch('/me', { bio: 'see t.me/someone' })).status, 400);
+    const own = (await api(t, a.token).get('/me')).body;
+    assert.equal(own.bio, 'Preparing for IELTS. I like math and chess.');
+    const seen = (await api(t, mate.token).get(`/users/${a.id}/card`)).body;
+    assert.deepEqual([seen.name, seen.username, seen.bio, seen.relation], ['Aziz Tursunov', a.username, own.bio, 'known']);
+    const far = (await api(t, stranger.token).get(`/users/${a.id}/card`)).body;
+    assert.deepEqual([far.username, far.bio, far.relation], [a.username, null, 'none']);
+    assert.equal((await api(t, mate.token).get(`/users/${kid.id}/card`)).status, 404, 'a minor is not visible to a classmate');
+    assert.equal((await api(t, x.user.token).get(`/users/${kid.id}/card`)).status, 200, 'the teacher sees their pupil');
+  });
 });

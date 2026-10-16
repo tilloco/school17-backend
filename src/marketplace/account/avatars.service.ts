@@ -46,21 +46,38 @@ export class AvatarsService {
     return !!(await this.prisma.classEnrollment.findFirst({ where: { pupilId: b, status: 'ACTIVE', classId: { in: mine.map((m) => m.classId) } }, select: { id: true } }));
   }
 
+  /** Bu odamni ko'rishga haqqi bormi (rasm va profil kartasi uchun bir xil qoida). */
+  private async mayView(actor: Actor, u: { id: string; role: Role; dateOfBirth: Date | null }): Promise<boolean> {
+    if (u.id === actor.id) return true;
+    const publicTeacher = u.role === Role.TEACHER && !!(await this.prisma.teacherProfile.findFirst({ where: { userId: u.id, verificationStatus: 'VERIFIED' }, select: { id: true } }));
+    if (publicTeacher) return true;
+    const minor = !u.dateOfBirth || ageInYears(u.dateOfBirth, this.clock.now()) < ADULT_AGE;
+    if (minor) return (actor.role === Role.TEACHER && (await this.teachesOrWorksWith(actor.id, u.id))) || (actor.role === Role.GUARDIAN && (await this.guardians.isActiveGuardianOf(actor.id, u.id)));
+    return (await this.classmates(actor.id, u.id)) || (await this.teachesOrWorksWith(actor.id, u.id)) || (await this.teachesOrWorksWith(u.id, actor.id));
+  }
+
+  /**
+   * Guruhda yozgan odamning kichik profili: ism, @nom, "men haqimda" va rasm bor-yo'qligi.
+   * 18 yoshgacha bo'lganlar uchun faqat ism ("Ism F."), @nom/bio/rasm yo'q — ularga faqat o'z o'qituvchisi va vasiysi to'liq ko'radi.
+   */
+  async card(actor: Actor, userId: string) {
+    const u = await this.prisma.user.findFirst({ where: { id: userId, status: 'ACTIVE', role: { not: Role.ADMIN } }, select: { id: true, name: true, username: true, bio: true, role: true, dateOfBirth: true, avatarFileId: true } });
+    if (!u) throw new NotFoundException('Not found');
+    const full = await this.mayView(actor, u);
+    const minor = !u.dateOfBirth || ageInYears(u.dateOfBirth, this.clock.now()) < ADULT_AGE;
+    if (!full) {
+      // Boshqa kattalar faqat ism va @nomini ko'radi (bu odam qidiruvda ham topiladi); kichiklar umuman ko'rinmaydi
+      if (minor || !u.username) throw new NotFoundException('Not found');
+      return { id: u.id, name: u.name, username: u.username, bio: null, role: u.role, hasPhoto: false, relation: 'none' as const };
+    }
+    return { id: u.id, name: u.name, username: u.username, bio: u.bio, role: u.role, hasPhoto: !!u.avatarFileId, relation: u.id === actor.id ? ('self' as const) : ('known' as const) };
+  }
+
   /** Rasm faylini qaytaradi yoki 404 (mavjud emas / ruxsat yo'q — farqlanmaydi). */
   async fileFor(actor: Actor, userId: string) {
     const u = await this.prisma.user.findFirst({ where: { id: userId, status: 'ACTIVE', avatarFileId: { not: null } }, select: { id: true, avatarFileId: true, role: true, dateOfBirth: true } });
     if (!u?.avatarFileId) throw new NotFoundException('Not found');
-    let ok = u.id === actor.id;
-    if (!ok) {
-      const publicTeacher = u.role === Role.TEACHER && !!(await this.prisma.teacherProfile.findFirst({ where: { userId: u.id, verificationStatus: 'VERIFIED' }, select: { id: true } }));
-      const minor = !u.dateOfBirth || ageInYears(u.dateOfBirth, this.clock.now()) < ADULT_AGE;
-      if (publicTeacher) ok = true;
-      else if (minor) {
-        ok = (actor.role === Role.TEACHER && (await this.teachesOrWorksWith(actor.id, u.id))) || (actor.role === Role.GUARDIAN && (await this.guardians.isActiveGuardianOf(actor.id, u.id)));
-      } else {
-        ok = (await this.classmates(actor.id, u.id)) || (await this.teachesOrWorksWith(actor.id, u.id)) || (await this.teachesOrWorksWith(u.id, actor.id));
-      }
-    }
+    const ok = await this.mayView(actor, u);
     if (!ok) throw new NotFoundException('Not found');
     const f = await this.prisma.storedFile.findFirst({ where: { id: u.avatarFileId, deletedAt: null, status: 'READY' } });
     if (!f?.thumbKey) throw new NotFoundException('Not found');

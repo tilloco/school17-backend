@@ -96,6 +96,7 @@ model User {
   emailVerifiedAt         DateTime? // Google tasdiqlagan e-pochta; parol bilan ro'yxatdan o'tganda bo'sh (tasdiqlanmagan)
   loginFailCount          Int                @default(0)
   lockedUntil             DateTime?
+  bio                     String? // qisqa "men haqimda" (200 belgigacha), telefon/havola yo'q; 18 yoshgacha bo'lganlarda boshqalarga ko'rsatilmaydi
   avatarFileId            String? // profil rasmi (StoredFile AVATAR); o'qituvchida TeacherProfile.photoFileId bilan bir xil
   username                String?            @unique // @nom: kichik harf, raqam, pastki chiziq; qidiruvda ishlatiladi
   phone                   String?            @unique // E.164, Telegram kod orqali tasdiqlangan; boshqalarga ko'rsatilmaydi

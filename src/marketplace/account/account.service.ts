@@ -16,6 +16,7 @@ export function isValidTimezone(tz: string): boolean {
 }
 
 import { normalizeUsername, usernameProblem } from './username';
+import { detectContactInfo } from '../safety/contact-info';
 
 export interface UpdateMeInput {
   name?: string;
@@ -23,6 +24,7 @@ export interface UpdateMeInput {
   timezone?: string;
   dateOfBirth?: string;
   username?: string;
+  bio?: string;
 }
 
 @Injectable()
@@ -36,6 +38,7 @@ export class AccountService {
       email: u.email,
       name: u.name,
       username: u.username,
+      bio: u.bio,
       hasPhoto: !!u.avatarFileId,
       role: u.role,
       locale: u.locale,
@@ -56,6 +59,11 @@ export class AccountService {
       const taken = await this.prisma.user.findFirst({ where: { username: un, id: { not: actor.id } }, select: { id: true } });
       if (taken) throw new ConflictException({ message: 'This username is taken', code: 'USERNAME_TAKEN' });
       data.username = un;
+    }
+    if (input.bio !== undefined) {
+      const bio = input.bio.trim().slice(0, 200);
+      if (bio && detectContactInfo(bio).found) throw new BadRequestException({ message: "The bio is public: please don't put a phone number or a link in it", code: 'CONTACT_INFO_NOT_ALLOWED' });
+      data.bio = bio || null;
     }
     if (input.locale !== undefined) {
       if (!(LOCALES as readonly string[]).includes(input.locale)) throw new BadRequestException('Unsupported locale');

@@ -18,6 +18,10 @@ export class AvatarsController {
   @Delete('me/avatar') @RequirePermission('account.read.self')
   remove(@CurrentActor() a: Actor) { return this.avatars.remove(a); }
 
+  /** Kichik profil kartasi (guruhdagi odamni bosganda): ism, @nom, bio. */
+  @Get('users/:id/card') @RequirePermission('account.read.self')
+  card(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.avatars.card(a, id); }
+
   /** Rasm (eskiz). Mobil Image komponenti Authorization sarlavhasi bilan oladi; brauzerda inline ko'rsatilmaydi. */
   @Get('users/:id/avatar') @RequirePermission('account.read.self')
   async get(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Res() res: any) {
