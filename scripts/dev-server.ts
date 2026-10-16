@@ -26,6 +26,12 @@ process.env.APP_DATA_KEY = process.env.APP_DATA_KEY || '00112233445566778899aabb
 process.env.FILES_DIR = process.env.FILES_DIR || join(process.cwd(), 'files');
 process.env.TRUST_PROXY = process.env.TRUST_PROXY ?? '1';
 process.env.CALL_PROVIDER = 'mock';
+// Real Telegram codes for local testing: put the Gateway token alone in backend/.devdb/telegram.token (gitignored). Without it, codes are shown on screen.
+try {
+  const tok = require('fs').readFileSync(join(process.cwd(), '..', 'telegram.token'), 'utf8').trim();
+  if (tok && !process.env.TELEGRAM_GATEWAY_TOKEN) process.env.TELEGRAM_GATEWAY_TOKEN = tok;
+} catch { /* no token file */ }
+process.env.PHONE_DEV_CODES = process.env.TELEGRAM_GATEWAY_TOKEN ? '' : '1';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { AppModule } = require('../src/app.module');
