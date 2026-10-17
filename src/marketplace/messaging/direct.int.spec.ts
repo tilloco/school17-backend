@@ -133,7 +133,7 @@ describe('direct messages, avatars, class reviews and comment reports (integrati
     assert.equal((await api(t, mate.token).post('/threads/direct', { userId: kid.id })).status, 403, 'adults cannot start a chat with a minor classmate either');
     assert.equal((await api(t, kid.token).post('/threads/direct', { userId: x.user.id })).status, 200, 'own teacher is fine');
     assert.equal((await api(t, stranger.token).get(`/threads/people?q=${kid.username.slice(0, 5)}`)).body.length, 0);
-    const found = (await api(t, stranger.token).get(`/threads/people?q=@${mate.username.slice(0, 6)}`)).body;
+    const found = (await api(t, stranger.token).get(`/threads/people?q=@${mate.username}`)).body;
     assert.equal(found[0].userId, mate.id);
     assert.deepEqual((await api(t, stranger.token).get('/threads/people?q=ab')).body, []);
     assert.equal(found.some((f: any) => f.userId === stranger.id), false, 'not yourself');
