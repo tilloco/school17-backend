@@ -132,13 +132,14 @@ describe('bookings (integration)', () => {
     assert.ok(asStudent);
   });
 
-  it('minors: cannot self-book; only a linked guardian can; guardian cannot book for adults or unlinked pupils', async () => {
+  it('minors: can self-book (a guardian is optional) or through a linked guardian; guardian cannot book for adults or unlinked pupils', async () => {
     const { profileId } = await teacher(true);
     const minor = await makeUser(t, Role.STUDENT, { dateOfBirth: '2012-05-05' });
     const guardian = await makeUser(t, Role.GUARDIAN);
     const stranger = await makeUser(t, Role.GUARDIAN);
     const adult = await makeUser(t, Role.STUDENT);
-    assert.equal((await book(minor, profileId, TUE_10)).status, 403);
+    const solo = await makeUser(t, Role.STUDENT, { dateOfBirth: '2012-05-05' });
+    assert.equal((await book(solo, profileId, TUE_12)).status, 201, 'a teen books alone');
     assert.equal((await book(guardian, profileId, TUE_10, { studentId: minor.id })).status, 404, 'not linked');
     await t.prisma.guardianLink.create({ data: { guardianId: guardian.id, studentId: minor.id, status: 'ACTIVE' } });
     await t.prisma.guardianLink.create({ data: { guardianId: guardian.id, studentId: adult.id, status: 'ACTIVE' } });

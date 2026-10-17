@@ -89,7 +89,7 @@ export class BookingService implements OnModuleInit, OnModuleDestroy {
     if (actor.role === Role.STUDENT) {
       if (input.studentId && input.studentId !== actor.id) throw new ForbiddenException('Forbidden');
       if (!actor.ageKnown) throw new ForbiddenException('Date of birth required');
-      if (actor.isMinor) throw new ForbiddenException('A guardian must book for minors');
+      // Vasiy majburiy emas: 18 yoshgacha bo'lgan o'quvchi ham o'zi bron qiladi (egasining qarori)
       studentId = actor.id;
     } else if (actor.role === Role.GUARDIAN) {
       if (!input.studentId) throw new BadRequestException('studentId required');
