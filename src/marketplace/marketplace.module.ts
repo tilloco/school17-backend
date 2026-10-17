@@ -40,6 +40,7 @@ import { ClassRemindersService } from './classes/class-reminders.service';
 import { ClassPollService } from './classes/class-poll.service';
 import { ClassPollController } from './classes/class-poll.controller';
 import { HomeService } from './home/home.service';
+import { ProgressService } from './home/progress.service';
 import { StudentsService } from './home/students.service';
 import { HomeController } from './home/home.controller';
 import { NetCheckController } from './classes/netcheck.controller';
@@ -99,6 +100,7 @@ import { CallsAdminController, CallsController, CallsWebhookController } from '.
     ClassFeedService,
     ClassPollService,
     HomeService,
+    ProgressService,
     StudentsService,
     ClassRemindersService,
     { provide: PDF_RENDERER, useFactory: () => createPdfRenderer() },
