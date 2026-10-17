@@ -17,7 +17,7 @@ export class ClassBoardController {
   get(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.board.get(a, sid); }
 
   // Mijoz har 15 soniyada (o'zgargan bo'lsa) yuboradi; 12/daqiqa chegarasi bundan ancha yuqori
-  @Throttle({ default: { limit: 12, ttl: 60_000 } })
+  @Throttle({ default: { limit: 40, ttl: 60_000 } })
   @Put('class-sessions/:sid/whiteboard') @RequirePermission('class.manage')
   put(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: BoardDto) { return this.board.put(a, sid, dto.strokes); }
 

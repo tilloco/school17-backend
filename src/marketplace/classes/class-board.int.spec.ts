@@ -96,7 +96,7 @@ describe('class whiteboard and feed (R6, integration)', () => {
       c2.set(at(-5));
       await api(th, x2.user.token).post(`/class-sessions/${sid2}/start`);
       const codes: number[] = [];
-      for (let i = 0; i < 15; i++) codes.push((await api(th, x2.user.token).put(`/class-sessions/${sid2}/whiteboard`, { strokes: [stroke()] })).status);
+      for (let i = 0; i < 45; i++) codes.push((await api(th, x2.user.token).put(`/class-sessions/${sid2}/whiteboard`, { strokes: [stroke()] })).status);
       assert.ok(codes.includes(429), codes.join(','));
       c2.set(null);
     } finally {
