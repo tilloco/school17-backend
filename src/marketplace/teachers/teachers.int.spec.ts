@@ -191,5 +191,10 @@ describe('teacher profiles (integration)', () => {
     assert.equal((await api(t, student.token).get(`/teachers/${prof.body.id}/credentials/${credId}/image`)).status, 404);
     await t.prisma.teacherCredential.update({ where: { id: credId }, data: { status: 'REJECTED' } });
     assert.equal((await api(t, student.token).get(`/teachers/${prof.body.id}/credentials/${credId}/image`)).status, 404, 'rejected credentials are never public');
+    // a verified teacher cannot strip all proof: the last credential stays unless a new one is added first
+    assert.equal((await c.del('/teachers/me/credentials/' + credId)).status, 409);
+    const extra = await makeFile(t, u.id);
+    assert.equal((await c.post('/teachers/me/credentials', { kind: 'CERTIFICATE', title: 'IELTS', fileId: extra.id })).status, 201);
+    assert.equal((await c.del('/teachers/me/credentials/' + credId)).status, 200);
   });
 });

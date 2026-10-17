@@ -83,8 +83,10 @@ describe('teacher setup backend gaps (A5): photo, counter-offer, money summary',
     await api(t, draft.token).put('/teachers/me/photo', { fileId: di.fileId });
     assert.equal((await api(t, draft.token).get(`/teachers/${prof.body.id}/photo`)).status, 200);
     assert.equal((await api(t, pupil.token).get(`/teachers/${prof.body.id}/photo`)).status, 404, 'unverified teachers are invisible');
-    await api(t, x.user.token).del('/teachers/me/photo');
-    assert.equal((await api(t, pupil.token).get(`/teachers/${x.profileId}/photo`)).status, 404);
+    assert.equal((await api(t, x.user.token).del('/teachers/me/photo')).status, 409, 'a verified teacher cannot remove the face photo');
+    assert.equal((await api(t, pupil.token).get(`/teachers/${x.profileId}/photo`)).status, 200, 'the photo is still there');
+    // a draft teacher may remove it
+    assert.equal((await api(t, draft.token).del('/teachers/me/photo')).status, 200);
   });
 
   it('counter-offer on a pending request: teacher only, pupil accepts => confirmed at the new time with a payment mark; rejects => stays pending', async () => {

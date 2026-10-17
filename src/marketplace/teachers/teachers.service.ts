@@ -136,6 +136,8 @@ export class TeachersService {
 
   async removePhoto(actor: Actor) {
     const p = await this.ownProfileOrThrow(actor);
+    // A teacher who is verified or waiting for the check must always keep a face photo (they can replace it, not remove it)
+    if (p.verificationStatus === 'VERIFIED' || p.verificationStatus === 'PENDING') throw new ConflictException({ message: 'A verified profile must keep its photo: choose a new one instead', code: 'PHOTO_REQUIRED' });
     await this.prisma.teacherProfile.update({ where: { id: p.id }, data: { photoFileId: null } });
     await this.prisma.user.update({ where: { id: actor.id }, data: { avatarFileId: null } });
     return { hasPhoto: false };
@@ -200,6 +202,10 @@ export class TeachersService {
 
   async removeCredential(actor: Actor, id: string) {
     const p = await this.ownProfileOrThrow(actor);
+    if (p.verificationStatus === 'VERIFIED' || p.verificationStatus === 'PENDING') {
+      const left = await this.prisma.teacherCredential.count({ where: { teacherId: p.id, id: { not: id } } });
+      if (left === 0) throw new ConflictException({ message: 'Keep at least one diploma or certificate: add a new one first', code: 'CREDENTIAL_REQUIRED' });
+    }
     const res = await this.prisma.teacherCredential.deleteMany({ where: { id, teacherId: p.id } });
     if (res.count === 0) throw new NotFoundException('Not found');
     return { ok: true };
