@@ -161,7 +161,7 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
     const stageCount = await this.prisma.classParticipant.count({ where: { sessionId, stage: { not: 'NONE' }, removedAt: null } });
     const me = teacher ? null : await this.prisma.classParticipant.findUnique({ where: { sessionId_pupilId: { sessionId, pupilId: actor.id } } });
     return {
-      id: s.id, classId: s.classId, role: teacher ? 'teacher' : 'pupil', status: s.status, startAt: s.startAt, endAt: s.endAt,
+      id: s.id, classId: s.classId, protectContent: !!(await this.prisma.class.findUnique({ where: { id: s.classId }, select: { protectContent: true } }))?.protectContent, role: teacher ? 'teacher' : 'pupil', status: s.status, startAt: s.startAt, endAt: s.endAt,
       lobbyOpensAt: new Date(s.startAt.getTime() - cfg.classLobbyMinutes * 60_000),
       stageMode: s.stageMode, chatMode: s.chatMode, questionsMode: s.questionsMode, slowModeSeconds: s.slowModeSeconds, handRaiseOn: s.handRaiseOn, locked: s.locked, spotlightPupilId: s.spotlightPupilId,
       teacherReconnecting: s.status === 'LIVE' && !!s.teacherAbsentSince, teacherNoShow: s.teacherNoShow, endReason: s.endReason,
