@@ -25,6 +25,9 @@ const ALLOWED_DECLARED_MIME: Record<string, DetectedType> = {
 
 const PURPOSES_FOR_USERS: StoredFilePurpose[] = ['CREDENTIAL', 'MESSAGE_ATTACHMENT', 'AVATAR', 'PAYMENT_PROOF', 'CLASS_FILE', 'HOMEWORK'];
 
+/** Ixtiyoriy turdagi fayl uchun e'lon qilingan MIME: faqat oddiy "tur/qism" ko'rinishi, aks holda ikkilik oqim. */
+const safeMime = (m: string) => (/^[a-z0-9][a-z0-9.+-]{0,60}\/[a-z0-9][a-z0-9.+-]{0,100}$/i.test(m) ? m.toLowerCase() : 'application/octet-stream');
+
 const newKey = () => `f_${randomBytes(16).toString('hex')}`;
 
 @Injectable()
@@ -53,14 +56,19 @@ export class FilesService {
     const cfg = marketConfig();
     if (!PURPOSES_FOR_USERS.includes(input.purpose)) throw new BadRequestException('Bad purpose');
     if (input.purpose === 'CREDENTIAL' && actor.role !== 'TEACHER') throw new ForbiddenException('Forbidden');
-    const type = ALLOWED_DECLARED_MIME[input.mime];
-    if (!type) throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
-    if ((input.purpose === 'AVATAR' || input.purpose === 'PAYMENT_PROOF') && type === 'pdf') throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
+    const known = ALLOWED_DECLARED_MIME[input.mime];
+    // Ixtiyoriy tur (video, arxiv, html, ...) — faqat o'qituvchi sinf materiali, xabar ilovasi va uy vazifasi uchun
+    const anyKind = !known && (input.purpose === 'CLASS_FILE' || input.purpose === 'MESSAGE_ATTACHMENT' || input.purpose === 'HOMEWORK');
+    const type = known;
+    if (!known && !anyKind) throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
+    if (known && (input.purpose === 'AVATAR' || input.purpose === 'PAYMENT_PROOF') && type === 'pdf') throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
     if (input.purpose === 'HOMEWORK' && actor.role !== 'STUDENT' && actor.role !== 'GUARDIAN') throw new ForbiddenException('Forbidden');
-    if (input.purpose === 'CLASS_FILE' && (actor.role !== 'TEACHER' || type !== 'pdf')) throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
-    const limit = input.purpose === 'CLASS_FILE' ? cfg.classFileMaxBytes : input.purpose === 'PAYMENT_PROOF' ? cfg.fileMaxProofBytes : type === 'pdf' ? cfg.fileMaxPdfBytes : cfg.fileMaxImageBytes;
+    if (input.purpose === 'CLASS_FILE' && actor.role !== 'TEACHER') throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
+    if (input.purpose === 'CLASS_FILE' && known && type !== 'pdf') throw new BadRequestException({ message: 'File type not allowed', code: 'TYPE_NOT_ALLOWED' });
+    const limit = anyKind ? cfg.fileMaxAnyBytes : input.purpose === 'CLASS_FILE' ? cfg.classFileMaxBytes : input.purpose === 'PAYMENT_PROOF' ? cfg.fileMaxProofBytes : type === 'pdf' ? cfg.fileMaxPdfBytes : cfg.fileMaxImageBytes;
     if (!Number.isInteger(input.size) || input.size <= 0) throw new BadRequestException('Bad size');
     if (input.size > limit) throw new PayloadTooLargeException({ message: 'File too large', code: 'FILE_TOO_LARGE', limitBytes: limit });
+    const chunkSize = input.size <= 64 * 1024 * 1024 ? cfg.fileChunkBytes : Math.min(16 * 1024 * 1024, Math.max(cfg.fileBigChunkBytes, Math.ceil(input.size / 10000)));
 
     await this.sweepPending(actor.id);
     // Disk himoyasi: bo'sh joy chegaradan past bo'lsa hech qanday yangi yuklash qabul qilinmaydi
@@ -68,7 +76,7 @@ export class FilesService {
     if (disk && disk.freeBytes - input.size < cfg.diskMinFreeBytes) throw new HttpException({ message: 'The server is low on disk space. Try again later.', code: 'DISK_LOW' }, 503);
     const used = await this.usedBytes(actor.id);
     let quota = cfg.fileUserQuotaBytes;
-    if (input.purpose === 'CLASS_FILE') {
+    if (input.purpose === 'CLASS_FILE' && actor.role === 'TEACHER') {
       const tp = await this.prisma.teacherProfile.findUnique({ where: { userId: actor.id }, select: { storageQuotaMb: true } });
       quota = tp?.storageQuotaMb ? tp.storageQuotaMb * 1024 * 1024 : cfg.teacherStorageQuotaBytes;
     }
@@ -78,7 +86,7 @@ export class FilesService {
     const file = await this.prisma.storedFile.create({
       data: {
         ownerId: actor.id, purpose: input.purpose, originalName: input.name.replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 120) || 'file',
-        mime: input.mime, declaredSize: input.size, storageKey: newKey(), chunkSize: cfg.fileChunkBytes,
+        mime: anyKind ? safeMime(input.mime) : input.mime, declaredSize: input.size, storageKey: newKey(), chunkSize,
       },
     });
     return this.uploadInfo(actor, file);
@@ -140,6 +148,8 @@ export class FilesService {
     const missing = Array.from({ length: chunkCount }, (_, i) => i).filter((i) => !present.includes(i));
     if (missing.length) throw new ConflictException({ message: 'Chunks missing', missing });
 
+    if (!ALLOWED_DECLARED_MIME[file.mime ?? '']) return this.completeAny(actor, file, chunkCount);
+
     const parts: Buffer[] = [];
     for (let i = 0; i < chunkCount; i++) parts.push(await this.storage.get(`${file.storageKey}/parts/${i}`));
     const raw = Buffer.concat(parts);
@@ -191,6 +201,21 @@ export class FilesService {
       },
     });
     await this.audit.log(actor, { action: 'file.ready', targetType: 'StoredFile', targetId: file.id, metadata: { purpose: file.purpose, bytes: finalData.length, scan: scan.status } });
+    return this.view(updated);
+  }
+
+  /** Ixtiyoriy tur: bo'laklar xotiraga yuklanmasdan diskda ulanadi. Hech qachon inline ko'rsatilmaydi (yuklab olinadi), skaner talab qilinsa — rad etiladi. */
+  private async completeAny(actor: Actor, file: StoredFile, chunkCount: number) {
+    if (marketConfig().fileScanRequired) return this.reject(file, 'scan_unavailable', 'ERROR', 'QUARANTINED');
+    const keys = Array.from({ length: chunkCount }, (_, i) => `${file.storageKey}/parts/${i}`);
+    const { size, sha256 } = await this.storage.concat(keys, `${file.storageKey}/blob`);
+    await this.storage.deletePrefix(`${file.storageKey}/parts`);
+    if (size !== file.declaredSize) { await this.storage.delete(`${file.storageKey}/blob`); return this.reject(file, 'size_mismatch'); }
+    const updated = await this.prisma.storedFile.update({
+      where: { id: file.id },
+      data: { status: 'READY', sizeBytes: size, finalMime: file.mime, sha256, completedAt: this.clock.now(), scanStatus: 'NOT_SCANNED' },
+    });
+    await this.audit.log(actor, { action: 'file.ready', targetType: 'StoredFile', targetId: file.id, metadata: { purpose: file.purpose, bytes: size, kind: 'any' } });
     return this.view(updated);
   }
 
@@ -264,6 +289,9 @@ export class FilesService {
     return { url: `${base}/files/blob/${fileId}/${variant}?${signedQuery(this.secret(), p)}`, expiresAt: new Date(exp * 1000) };
   }
 
+  /** Fayl oqimi (Range uchun). */
+  stream(key: string, range?: { start: number; end: number }) { return this.storage.stream(key, range); }
+
   /** Imzolangan GET. Javob sarlavhalari: har doim yuklab olish (inline emas), nosniff, sandbox CSP. */
   async serve(fileId: string, variant: string, uid: string, exp: number, sig: string) {
     const p: SignedParams = { op: 'get', fileId, part: variant, uid, exp };
@@ -277,10 +305,13 @@ export class FilesService {
     const read = (key: string) => this.storage.get(key).catch(() => { throw new NotFoundException('Not found'); });
     if (variant === 'thumb') {
       if (!file.thumbKey) throw new NotFoundException('No thumbnail');
-      return { data: await read(file.thumbKey), mime: 'image/webp', name: 'thumb.webp' };
+      const data = await read(file.thumbKey);
+      return { data, size: data.length, mime: 'image/webp', name: 'thumb.webp' };
     }
     if (variant !== 'original') throw new NotFoundException('Not found');
-    return { data: await read(`${file.storageKey}/blob`), mime: file.finalMime ?? 'application/octet-stream', name: file.originalName };
+    const key = `${file.storageKey}/blob`;
+    const size = await this.storage.size(key).catch(() => { throw new NotFoundException('Not found'); });
+    return { key, size, mime: file.finalMime ?? 'application/octet-stream', name: file.originalName };
   }
 
   // ---------- boshqaruv ----------

@@ -9,7 +9,7 @@ import { FilesService } from './files.service';
 class InitDto {
   @IsEnum(StoredFilePurpose) purpose!: StoredFilePurpose;
   @IsString() @MaxLength(200) name!: string;
-  @IsInt() @Min(1) @Max(1_000_000_000) size!: number;
+  @IsInt() @Min(1) @Max(2 ** 50) size!: number;
   @IsString() @MaxLength(100) mime!: string;
 }
 class DownloadDto {
@@ -76,6 +76,7 @@ export class FilesStorageController {
     @Query('uid') uid: string,
     @Query('exp') exp: string,
     @Query('sig') sig: string,
+    @Req() req: any,
     @Res() res: any,
   ) {
     const f = await this.files.serve(fileId, variant, uid, Number(exp), sig);
@@ -85,8 +86,30 @@ export class FilesStorageController {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
     res.setHeader('Cache-Control', 'private, no-store');
-    res.setHeader('Content-Length', String(f.data.length));
-    res.status(200).end(f.data);
+    res.setHeader('Accept-Ranges', 'bytes');
+    if ('data' in f && f.data) {
+      res.setHeader('Content-Length', String(f.data.length));
+      res.status(200).end(f.data);
+      return;
+    }
+    // Katta fayllar: oqim va Range (video ko'rish, yuklashni davom ettirish)
+    const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
+    let start = 0;
+    let end = f.size - 1;
+    if (m && (m[1] || m[2])) {
+      if (m[1]) { start = Number(m[1]); if (m[2]) end = Math.min(end, Number(m[2])); }
+      else { start = Math.max(0, f.size - Number(m[2])); }
+      if (start > end || start >= f.size) { res.setHeader('Content-Range', `bytes */${f.size}`); res.status(416).end(); return; }
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${f.size}`);
+    } else {
+      res.status(200);
+    }
+    res.setHeader('Content-Length', String(end - start + 1));
+    const rs = this.files.stream(f.key!, { start, end });
+    rs.on('error', () => res.destroy());
+    res.on('close', () => (rs as any).destroy?.());
+    rs.pipe(res);
   }
 }
 

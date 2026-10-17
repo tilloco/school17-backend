@@ -7,7 +7,7 @@ import helmet from 'helmet';
 export function configureRawWebhook(app: INestApplication) {
   app.use('/calls/webhook', raw({ type: () => true, limit: '100kb' }));
   // Fayl bo'laklari (1 MiB + zaxira): xom bayt sifatida qabul qilinadi
-  app.use('/files/upload', raw({ type: () => true, limit: '1100kb' }));
+  app.use('/files/upload', raw({ type: () => true, limit: '17mb' }));
 }
 
 /**

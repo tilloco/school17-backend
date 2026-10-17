@@ -46,7 +46,7 @@ describe('files (integration)', () => {
     const u = await makeUser(t);
     const c = api(t, u.token);
     for (const mime of ['image/svg+xml', 'text/html', 'application/x-msdownload', 'application/zip', 'application/javascript', 'image/gif']) {
-      const r = await c.post('/files/init', { purpose: 'MESSAGE_ATTACHMENT', name: 'x', size: 100, mime });
+      const r = await c.post('/files/init', { purpose: 'AVATAR', name: 'x', size: 100, mime });
       assert.equal(r.status, 400, mime);
       assert.equal(r.body.code, 'TYPE_NOT_ALLOWED');
     }
@@ -165,7 +165,7 @@ describe('files (integration)', () => {
     assert.equal((await fetch(t.baseUrl + part0.replace(/uid=[^&]+/, 'uid=' + other.id), { method: 'PUT', body: pdf.subarray(0, CHUNK) as any })).status, 403, 'other user');
     const idx2 = part0.replace('/0?', '/5?');
     assert.equal((await fetch(t.baseUrl + idx2, { method: 'PUT', body: pdf.subarray(0, CHUNK) as any })).status, 403, 'signature is bound to the index');
-    clock.set(new Date(NOW.getTime() + 20 * 60_000)); // 15 daqiqalik URL muddati o'tdi
+    clock.set(new Date(NOW.getTime() + 5 * 3_600_000)); // 4 soatlik URL muddati o'tdi
     assert.equal((await fetch(t.baseUrl + part0, { method: 'PUT', body: pdf.subarray(0, CHUNK) as any })).status, 403, 'expired');
     clock.set(NOW);
     assert.equal((await fetch(t.baseUrl + part0, { method: 'PUT', body: pdf.subarray(0, CHUNK) as any })).status, 200);
@@ -235,6 +235,33 @@ describe('files (integration)', () => {
     const u2 = await makeUser(t);
     const r2 = await uploadFile(t, u2, { mime: 'application/pdf', bytes: makePdf() });
     assert.equal(r2.complete.body.scanStatus, 'NOT_SCANNED');
+  });
+
+  it('any file type: a teacher uploads a big zip/html/video as class material; it is streamed back with Range and never shown inline', async () => {
+    const x = await makeTeacher(t, { approve: { adminToken: admin.token } });
+    const bytes = Buffer.alloc(2.5 * CHUNK + 123);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 31 + 7) & 255;
+    for (const [mime, name] of [['application/zip', 'course.zip'], ['text/html', 'lesson.html'], ['video/mp4', 'week1.mp4']]) {
+      const up = await uploadFile(t, x.user, { purpose: 'CLASS_FILE', name, mime, bytes });
+      assert.equal(up.complete.status, 200, JSON.stringify(up.complete.body));
+      assert.equal(up.complete.body.status, 'READY');
+      const url = (await api(t, x.user.token).post('/files/' + up.fileId + '/download-url', {})).body.url as string;
+      const full = await fetch(t.baseUrl + url);
+      assert.equal(full.status, 200);
+      assert.match(full.headers.get('content-disposition') ?? '', /^attachment/);
+      assert.equal(full.headers.get('x-content-type-options'), 'nosniff');
+      assert.match(full.headers.get('content-security-policy') ?? '', /sandbox/);
+      assert.ok(Buffer.from(await full.arrayBuffer()).equals(bytes), 'bytes are identical');
+      const part = await fetch(t.baseUrl + url, { headers: { range: 'bytes=1000-1999' } });
+      assert.equal(part.status, 206);
+      assert.equal(part.headers.get('content-range'), `bytes 1000-1999/${bytes.length}`);
+      assert.ok(Buffer.from(await part.arrayBuffer()).equals(bytes.subarray(1000, 2000)));
+    }
+    const kid = await makeUser(t);
+    assert.equal((await api(t, kid.token).post('/files/init', { purpose: 'CLASS_FILE', name: 'a.zip', size: 10, mime: 'application/zip' })).status, 400, 'class material is for teachers');
+    assert.equal((await api(t, kid.token).post('/files/init', { purpose: 'AVATAR', name: 'a.zip', size: 10, mime: 'application/zip' })).status, 400, 'a profile photo must be an image');
+    const huge = await api(t, x.user.token).post('/files/init', { purpose: 'CLASS_FILE', name: 'big.mkv', size: 101 * 1024 * 1024 * 1024, mime: 'video/x-matroska' });
+    assert.equal(huge.status, 413);
   });
 
   it('download authorization: owner yes; stranger 404; signed URL bound to user, variant and time', async () => {

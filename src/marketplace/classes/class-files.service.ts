@@ -83,20 +83,21 @@ export class ClassFilesService implements OnModuleInit {
     return f;
   }
 
-  private view(f: ClassFile, sizeBytes?: number) {
-    return { id: f.id, name: f.name, pageCount: f.pageCount, renderedPages: f.renderedPages, renderStatus: f.renderStatus, renderError: f.renderError, allowDownload: f.allowDownload, sizeBytes: sizeBytes ?? null, createdAt: f.createdAt, fileId: f.fileId };
+  private view(f: ClassFile, sizeBytes?: number, mime?: string | null) {
+    return { mime: mime ?? null, id: f.id, name: f.name, pageCount: f.pageCount, renderedPages: f.renderedPages, renderStatus: f.renderStatus, renderError: f.renderError, allowDownload: f.allowDownload, sizeBytes: sizeBytes ?? null, createdAt: f.createdAt, fileId: f.fileId };
   }
 
   // ---------- kutubxona ----------
   async add(actor: Actor, classId: string, fileId: string, allowDownload?: boolean) {
     const c = await this.teacherOf(actor, classId);
     const sf = await this.prisma.storedFile.findFirst({ where: { id: fileId, ownerId: actor.id, purpose: 'CLASS_FILE', status: 'READY', deletedAt: null } });
-    if (!sf || sf.finalMime !== 'application/pdf') throw new NotFoundException('File not found');
+    if (!sf) throw new NotFoundException('File not found');
+    const isPdf = sf.finalMime === 'application/pdf'; // boshqa turlar (video, arxiv, html...) sahifalarga bo'linmaydi: darrov tayyor, yuklab olinadi
     try {
-      const f = await this.prisma.classFile.create({ data: { classId, fileId, uploaderId: actor.id, name: sf.originalName, allowDownload: allowDownload ?? c.allowDownload } });
+      const f = await this.prisma.classFile.create({ data: { classId, fileId, uploaderId: actor.id, name: sf.originalName, allowDownload: isPdf ? (allowDownload ?? c.allowDownload) : true, ...(isPdf ? {} : { renderStatus: 'READY' as const }) } });
       await this.audit.log(actor, { action: 'class.file.add', targetType: 'ClassFile', targetId: f.id });
-      this.kick(f.id);
-      return this.view(f, sf.sizeBytes);
+      if (isPdf) this.kick(f.id);
+      return this.view(f, sf.sizeBytes, sf.finalMime);
     } catch (e: any) {
       if (e?.code === 'P2002') throw new ConflictException({ message: 'File already added', code: 'ALREADY_ADDED' });
       throw e;
@@ -107,8 +108,8 @@ export class ClassFilesService implements OnModuleInit {
     await this.memberOf(actor, classId);
     const term = q?.trim().slice(0, 100);
     const rows = await this.prisma.classFile.findMany({ where: { classId, deletedAt: null, takedownAt: null, ...(term ? { name: { contains: term, mode: 'insensitive' } } : {}) }, orderBy: { createdAt: 'desc' }, take: 200 });
-    const sizes = new Map((await this.prisma.storedFile.findMany({ where: { id: { in: rows.map((r) => r.fileId) } }, select: { id: true, sizeBytes: true } })).map((s) => [s.id, s.sizeBytes]));
-    return rows.map((r) => this.view(r, sizes.get(r.fileId)));
+    const sizes = new Map((await this.prisma.storedFile.findMany({ where: { id: { in: rows.map((r) => r.fileId) } }, select: { id: true, sizeBytes: true, finalMime: true } })).map((s) => [s.id, s]));
+    return rows.map((r) => this.view(r, sizes.get(r.fileId)?.sizeBytes, sizes.get(r.fileId)?.finalMime));
   }
 
   async setDownload(actor: Actor, classId: string, id: string, allowDownload: boolean) {

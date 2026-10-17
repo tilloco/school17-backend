@@ -41,16 +41,18 @@ export function marketConfig() {
     fileMaxPdfBytes: int('FILE_MAX_PDF_BYTES', 50 * 1024 * 1024),
     fileUserQuotaBytes: int('FILE_USER_QUOTA_BYTES', 500 * 1024 * 1024),
     fileChunkBytes: 1024 * 1024,
+    fileBigChunkBytes: 8 * 1024 * 1024, // katta fayllar uchun bo'lak (16 MiB dan oshmasin: raw body limit)
+    fileMaxAnyBytes: int('FILE_MAX_ANY_BYTES', 100 * 1024 * 1024 * 1024), // ixtiyoriy turdagi fayl (video, arxiv, html...) uchun: 100 GiB
     // Sinf fayllari (R5): PDF taqdimot kutubxonasi
     classFileMaxBytes: int('FILE_MAX_BYTES', 500 * 1024 * 1024), // bitta sinf PDF'i, standart 500 MiB (DIQQAT: yig'ish hozircha xotirada, KNOWN_GAPS)
-    teacherStorageQuotaBytes: int('TEACHER_STORAGE_QUOTA_BYTES', 20 * 1024 * 1024 * 1024), // o'qituvchi uchun umumiy kvota; admin alohida oshira oladi
+    teacherStorageQuotaBytes: int('TEACHER_STORAGE_QUOTA_BYTES', 1024 * 1024 * 1024 * 1024), // o'qituvchi uchun umumiy kvota; admin alohida oshira oladi
     diskMinFreeBytes: int('DISK_MIN_FREE_BYTES', 1024 * 1024 * 1024), // diskda shundan kam bo'sh joy qolsa yangi yuklashlar rad etiladi
     pdfMaxPages: int('PDF_MAX_PAGES', 600), // bitta PDF dagi sahifalar chegarasi
     pdfRenderTimeoutSec: int('PDF_RENDER_TIMEOUT_SEC', 300), // bitta fayl uchun umumiy vaqt chegarasi
     pdfFullWidth: int('PDF_FULL_WIDTH', 1000), // asosiy sahifa rasmi kengligi (px)
     pdfSmallWidth: int('PDF_SMALL_WIDTH', 600), // sust tarmoq uchun kichik rasm
     pdfThumbWidth: int('PDF_THUMB_WIDTH', 200), // eskiz
-    uploadUrlTtlSeconds: int('FILE_UPLOAD_URL_TTL_SECONDS', 900),
+    uploadUrlTtlSeconds: int('FILE_UPLOAD_URL_TTL_SECONDS', 14400),
     downloadUrlTtlSeconds: int('FILE_DOWNLOAD_URL_TTL_SECONDS', 120),
     pendingUploadMaxAgeHours: int('FILE_PENDING_MAX_AGE_HOURS', 24),
     // true bo'lsa va skaner sozlanmagan/xato bersa fayl KARANTINga tushadi (fail closed)

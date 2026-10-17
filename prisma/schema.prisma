@@ -553,8 +553,8 @@ model StoredFile {
   purpose             StoredFilePurpose
   originalName        String
   mime                String?
-  sizeBytes           Int                 @default(0)
-  declaredSize        Int                 @default(0)
+  sizeBytes           Float               @default(0)
+  declaredSize        Float               @default(0)
   storageKey          String              @unique
   sha256              String?
   finalMime           String?

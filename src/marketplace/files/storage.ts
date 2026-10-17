@@ -1,4 +1,5 @@
-import { promises as fs } from 'fs';
+import { createHash } from 'crypto';
+import { createReadStream, createWriteStream, promises as fs } from 'fs';
 import { dirname, join, normalize, sep } from 'path';
 
 /**
@@ -13,6 +14,10 @@ export interface ObjectStorage {
   list(prefix: string): Promise<string[]>;
   delete(key: string): Promise<void>;
   deletePrefix(prefix: string): Promise<void>;
+  /** Bo'laklarni xotiraga yuklamasdan bitta faylga ulaydi (katta fayllar uchun); hajm va sha256 qaytaradi. */
+  concat(keys: string[], destKey: string): Promise<{ size: number; sha256: string }>;
+  /** Fayl (yoki uning [start,end] oralig'i) oqimi: Range so'rovlari uchun. */
+  stream(key: string, range?: { start: number; end: number }): NodeJS.ReadableStream;
   /** Diskdagi jami/bo'sh joy (bayt). S3 kabi saqlagichlarda bo'lmasligi mumkin. */
   diskStats?(): Promise<{ totalBytes: number; freeBytes: number }>;
 }
@@ -62,6 +67,30 @@ export class LocalDiskStorage implements ObjectStorage {
     await fs.mkdir(this.root, { recursive: true });
     const st = await fs.statfs(this.root);
     return { totalBytes: Number(st.blocks) * Number(st.bsize), freeBytes: Number(st.bavail) * Number(st.bsize) };
+  }
+  async concat(keys: string[], destKey: string) {
+    const dest = this.path(destKey);
+    await fs.mkdir(dirname(dest), { recursive: true });
+    const out = createWriteStream(dest);
+    const hash = createHash('sha256');
+    let size = 0;
+    try {
+      for (const k of keys) {
+        await new Promise<void>((resolve, reject) => {
+          const rs = createReadStream(this.path(k));
+          rs.on('data', (c) => { hash.update(c); size += (c as Buffer).length; });
+          rs.on('error', reject);
+          rs.on('end', resolve);
+          rs.pipe(out, { end: false });
+        });
+      }
+    } finally {
+      await new Promise<void>((resolve) => out.end(resolve));
+    }
+    return { size, sha256: hash.digest('hex') };
+  }
+  stream(key: string, range?: { start: number; end: number }) {
+    return createReadStream(this.path(key), range ? { start: range.start, end: range.end } : undefined);
   }
   async deletePrefix(prefix: string) {
     await fs.rm(this.path(prefix.replace(/\/$/, '')), { recursive: true, force: true });

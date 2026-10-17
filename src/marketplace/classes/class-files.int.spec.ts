@@ -58,6 +58,23 @@ describe('class PDF presenter and library (R5, integration)', () => {
     await t.close();
   });
 
+  it('any file type in a class: a zip lands as ready (no pages), pupils list and download it', async () => {
+    const { x, c, ps } = await klass(1);
+    const bytes = Buffer.from('PK-not-really-a-zip-but-any-bytes-are-fine'.repeat(50));
+    const up = await uploadFile(t, x.user, { purpose: 'CLASS_FILE', name: 'week1.zip', mime: 'application/zip', bytes });
+    assert.equal(up.complete?.status, 200, JSON.stringify(up.complete?.body));
+    const r = await api(t, x.user.token).post(`/classes/${c.id}/files`, { fileId: up.fileId });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal(r.body.renderStatus, 'READY');
+    assert.equal(r.body.mime, 'application/zip');
+    const list = (await api(t, ps[0].token).get(`/classes/${c.id}/files`)).body;
+    assert.equal(list[0].name, 'week1.zip');
+    const dl = await api(t, ps[0].token).post(`/classes/${c.id}/files/${r.body.id}/download-url`, {});
+    assert.equal(dl.status, 200, JSON.stringify(dl.body));
+    const got = await fetch(t.baseUrl + dl.body.url);
+    assert.ok(Buffer.from(await got.arrayBuffer()).equals(bytes));
+  });
+
   it('route matrix', async () => {
     const actors = { STUDENT: await makeUser(t, Role.STUDENT), GUARDIAN: await makeUser(t, Role.GUARDIAN), TEACHER: (await makeTeacher(t, { approve: { adminToken: admin.token } })).user, adminToken: admin.token };
     const id = '11111111-1111-4111-8111-111111111111';
