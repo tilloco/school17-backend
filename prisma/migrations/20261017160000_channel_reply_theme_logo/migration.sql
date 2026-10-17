@@ -1,0 +1,3 @@
+ALTER TABLE "Class" ADD COLUMN "theme" TEXT NOT NULL DEFAULT 'ocean';
+ALTER TABLE "Class" ADD COLUMN "logoFileId" TEXT;
+ALTER TABLE "ClassChannelPost" ADD COLUMN "replyToId" TEXT;

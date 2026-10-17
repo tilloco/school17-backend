@@ -29,7 +29,7 @@ export class ClassChannelService {
     throw new NotFoundException('Class not found');
   }
 
-  private async view(actor: Actor, teacherUserId: string, rows: { id: string; seq: number; authorId: string; body: string; fileId: string | null; createdAt: Date; pinnedAt?: Date | null }[]) {
+  private async view(actor: Actor, teacherUserId: string, rows: { id: string; seq: number; authorId: string; body: string; fileId: string | null; createdAt: Date; pinnedAt?: Date | null; replyToId?: string | null }[]) {
     const authors = await this.prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.authorId))] } }, select: { id: true, name: true, username: true, dateOfBirth: true, avatarFileId: true } });
     const names = new Map(authors.map((a) => [a.id, a.name]));
     const info = new Map(authors.map((a) => [a.id, a]));
@@ -37,11 +37,21 @@ export class ClassChannelService {
     const fileIds = rows.map((r) => r.fileId).filter((x): x is string => !!x);
     const files = fileIds.length ? await this.prisma.storedFile.findMany({ where: { id: { in: fileIds } } }) : [];
     const byId = new Map(files.map((f) => [f.id, f]));
+    const replyIds = [...new Set(rows.map((r) => r.replyToId).filter((x): x is string => !!x))];
+    const replied = replyIds.length ? await this.prisma.classChannelPost.findMany({ where: { id: { in: replyIds } }, select: { id: true, body: true, authorId: true, fileId: true, deletedAt: true } }) : [];
+    const repliedAuthors = replied.length ? await this.prisma.user.findMany({ where: { id: { in: [...new Set(replied.map((p) => p.authorId))] } }, select: { id: true, name: true } }) : [];
+    const authorName = new Map(repliedAuthors.map((a) => [a.id, a.name]));
+    const repliedBy = new Map(replied.map((p) => [p.id, p]));
     return rows.map((r) => {
       const f: StoredFile | undefined = r.fileId ? byId.get(r.fileId) : undefined;
       const mime = f?.finalMime ?? f?.mime ?? '';
       return {
         id: r.id, seq: r.seq, at: r.createdAt, body: r.body, mine: r.authorId === actor.id, pinned: !!r.pinnedAt,
+        replyTo: (() => {
+          const o = r.replyToId ? repliedBy.get(r.replyToId) : undefined;
+          if (!o) return null;
+          return o.deletedAt ? { id: o.id, deleted: true, body: '', author: null, hasFile: false } : { id: o.id, deleted: false, body: o.body.slice(0, 140), author: authorName.get(o.authorId) ?? null, hasFile: !!o.fileId };
+        })(),
         // a minor's @username, photo and id are shown only to the class teacher (and to the minor); classmates see the name only
         author: (() => {
           const a = info.get(r.authorId);
@@ -80,7 +90,7 @@ export class ClassChannelService {
     return out;
   }
 
-  async post(actor: Actor, classId: string, input: { body?: string; fileId?: string }) {
+  async post(actor: Actor, classId: string, input: { body?: string; fileId?: string; replyToId?: string }) {
     const c = await this.ctx(actor, classId);
     if (c.status !== 'ACTIVE') throw new ConflictException({ message: 'This class is closed', code: 'CLASS_CLOSED' });
     const body = (input.body ?? '').trim();
@@ -98,7 +108,11 @@ export class ClassChannelService {
       if (f.status !== 'READY') throw new ConflictException('File is not ready');
       if (await this.prisma.classChannelPost.findUnique({ where: { fileId: f.id } })) throw new ConflictException('File already sent');
     }
-    const row = await this.prisma.classChannelPost.create({ data: { classId, authorId: actor.id, body, fileId: input.fileId ?? null, createdAt: this.clock.now() } });
+    if (input.replyToId) {
+      const target = await this.prisma.classChannelPost.findFirst({ where: { id: input.replyToId, classId, deletedAt: null }, select: { id: true } });
+      if (!target) throw new NotFoundException('The message you reply to was not found');
+    }
+    const row = await this.prisma.classChannelPost.create({ data: { classId, authorId: actor.id, body, fileId: input.fileId ?? null, replyToId: input.replyToId ?? null, createdAt: this.clock.now() } });
     await this.prisma.classChannelRead.upsert({ where: { classId_userId: { classId, userId: actor.id } }, create: { classId, userId: actor.id, lastSeq: row.seq }, update: { lastSeq: row.seq } }).catch(() => undefined);
     const [item] = await this.view(actor, c.teacherUserId, [row]);
     const members = await this.prisma.classEnrollment.findMany({ where: { classId, status: 'ACTIVE' }, select: { pupilId: true } });
@@ -133,7 +147,7 @@ export class ClassChannelService {
     const c = await this.ctx(actor, classId);
     const cls = await this.prisma.class.findUniqueOrThrow({
       where: { id: classId },
-      select: { id: true, title: true, subject: true, description: true, priceMinor: true, capacity: true, enrolledCount: true, protectContent: true, startDate: true, endDate: true, weekdays: true, startMinute: true, durationMin: true, timezone: true, createdAt: true, teacher: { select: { userId: true, headline: true, subjects: true, user: { select: { name: true, username: true, bio: true, avatarFileId: true } } } } },
+      select: { id: true, title: true, subject: true, description: true, priceMinor: true, capacity: true, enrolledCount: true, protectContent: true, theme: true, logoFileId: true, startDate: true, endDate: true, weekdays: true, startMinute: true, durationMin: true, timezone: true, createdAt: true, teacher: { select: { userId: true, headline: true, subjects: true, user: { select: { name: true, username: true, bio: true, avatarFileId: true } } } } },
     });
     const now = this.clock.now();
     const [upcoming, files, pins] = await Promise.all([
@@ -144,10 +158,45 @@ export class ClassChannelService {
     const t = cls.teacher;
     return {
       id: cls.id, title: cls.title, subject: cls.subject, description: cls.description, priceMinor: cls.priceMinor, members: cls.enrolledCount + 1, createdAt: cls.createdAt,
-      protectContent: cls.protectContent, role: c.teacher ? 'teacher' : 'pupil', startDate: cls.startDate, endDate: cls.endDate, weekdays: cls.weekdays, startMinute: cls.startMinute, durationMin: cls.durationMin, timezone: cls.timezone,
+      protectContent: cls.protectContent, theme: cls.theme, hasLogo: !!cls.logoFileId, role: c.teacher ? 'teacher' : 'pupil', startDate: cls.startDate, endDate: cls.endDate, weekdays: cls.weekdays, startMinute: cls.startMinute, durationMin: cls.durationMin, timezone: cls.timezone,
       teacher: { id: t.userId, name: t.user.name, username: t.user.username, bio: t.user.bio ?? t.headline ?? null, subjects: t.subjects, hasPhoto: !!t.user.avatarFileId },
       upcoming, filesCount: files, pinsCount: pins,
     };
+  }
+
+  /** Kanal a'zolari (o'qituvchi + faol o'quvchilar). 18 yoshgacha bo'lganlarning id/@nom/rasmi faqat o'qituvchiga va o'ziga ko'rinadi. */
+  async members(actor: Actor, classId: string) {
+    const c = await this.ctx(actor, classId);
+    const now = this.clock.now();
+    const rows = await this.prisma.classEnrollment.findMany({ where: { classId, status: 'ACTIVE' }, orderBy: { createdAt: 'asc' }, take: 1000, select: { pupil: { select: { id: true, name: true, username: true, dateOfBirth: true, avatarFileId: true } } } });
+    const teacher = await this.prisma.user.findUniqueOrThrow({ where: { id: c.teacherUserId }, select: { id: true, name: true, username: true, avatarFileId: true } });
+    const mapPupil = (u: { id: string; name: string | null; username: string | null; dateOfBirth: Date | null; avatarFileId: string | null }) => {
+      const minor = !u.dateOfBirth || ageInYears(u.dateOfBirth, now) < ADULT_AGE;
+      const show = !minor || c.teacher || u.id === actor.id;
+      return { id: show ? u.id : null, name: u.name, username: show ? u.username : null, hasPhoto: show && !!u.avatarFileId, teacher: false, me: u.id === actor.id };
+    };
+    return { items: [{ id: teacher.id, name: teacher.name, username: teacher.username, hasPhoto: !!teacher.avatarFileId, teacher: true, me: teacher.id === actor.id }, ...rows.map((r) => mapPupil(r.pupil))] };
+  }
+
+  /** Kanal logosini o'rnatish (faqat o'qituvchi; rasm AVATAR maqsadida yuklangan bo'lishi kerak). */
+  async setLogo(actor: Actor, classId: string, fileId: string) {
+    const c = await this.ctx(actor, classId);
+    if (!c.teacher) throw new ForbiddenException('Only the teacher can change the logo');
+    const f = await this.prisma.storedFile.findFirst({ where: { id: fileId, ownerId: actor.id, deletedAt: null } });
+    if (!f) throw new NotFoundException('File not found');
+    if (f.purpose !== 'AVATAR') throw new BadRequestException('File has wrong purpose');
+    if (f.status !== 'READY' || !f.thumbKey) throw new ConflictException('File is not a ready image');
+    await this.prisma.class.update({ where: { id: classId }, data: { logoFileId: f.id } });
+    return { hasLogo: true };
+  }
+
+  async logoFile(actor: Actor, classId: string) {
+    await this.ctx(actor, classId);
+    const cls = await this.prisma.class.findUnique({ where: { id: classId }, select: { logoFileId: true } });
+    if (!cls?.logoFileId) throw new NotFoundException('No logo');
+    const f = await this.prisma.storedFile.findFirst({ where: { id: cls.logoFileId, deletedAt: null, status: 'READY' } });
+    if (!f?.thumbKey) throw new NotFoundException('No logo');
+    return f;
   }
 
   async remove(actor: Actor, classId: string, postId: string) {

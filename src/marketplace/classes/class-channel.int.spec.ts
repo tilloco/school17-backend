@@ -1,7 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { Role } from '@prisma/client';
-import { api, createTestApp, makeAdmin, makeFile, makeTeacher, makeUser, TestApp } from '../testing/harness';
+import { api, createTestApp, makeAdmin, makeFile, makeJpeg, makeTeacher, makeUser, TestApp, uploadFile } from '../testing/harness';
 
 describe('class channel (everyone in the class writes, integration)', () => {
   let t: TestApp;
@@ -73,6 +73,45 @@ describe('class channel (everyone in the class writes, integration)', () => {
     assert.equal(info.upcoming.length, 1);
     assert.equal(info.pinsCount, 100);
     assert.equal((await api(t, stranger.token).get(`${base}/info`)).status, 404);
+  });
+
+  it('replies: a message can answer another one; the quote survives and shows deleted originals; replies to other classes are refused', async () => {
+    const { x, a, base } = await setup();
+    const q = (await api(t, a.token).post(base, { body: 'Dars soat nechada?' })).body.id;
+    const r = (await api(t, x.user.token).post(base, { body: '18:00 da', replyToId: q })).body;
+    assert.equal(r.replyTo.id, q);
+    assert.equal(r.replyTo.body, 'Dars soat nechada?');
+    assert.equal(r.replyTo.author, 'Aziz Tursunov');
+    const other = await setup();
+    const foreign = (await api(t, other.x.user.token).post(other.base, { body: 'x' })).body.id;
+    assert.equal((await api(t, x.user.token).post(base, { body: 'hi', replyToId: foreign })).status, 404, 'cannot quote another class');
+    assert.equal((await api(t, a.token).del(`${base}/${q}`)).status, 200);
+    const again = (await api(t, x.user.token).get(base)).body.items.find((m: any) => m.id === r.id);
+    assert.equal(again.replyTo.deleted, true);
+    assert.equal(again.replyTo.body, '');
+  });
+
+  it('theme, logo and member list: the teacher sets a colour theme and a logo, members read them, strangers cannot', async () => {
+    const { x, a, stranger, c, base } = await setup();
+    assert.equal((await api(t, a.token).patch(`/classes/${c.id}`, { theme: 'sunset' })).status, 403);
+    assert.equal((await api(t, x.user.token).patch(`/classes/${c.id}`, { theme: 'neon-pink-2000' })).status, 400);
+    assert.equal((await api(t, x.user.token).patch(`/classes/${c.id}`, { theme: 'sunset' })).status, 200);
+    const up = await uploadFile(t, x.user, { purpose: 'AVATAR', name: 'logo.jpg', mime: 'image/jpeg', bytes: await makeJpeg(120, 120, false) });
+    assert.equal(up.complete.status, 200, JSON.stringify(up.complete.body));
+    assert.equal((await api(t, a.token).put(`${base}/logo`, { fileId: up.fileId })).status, 403);
+    assert.equal((await api(t, x.user.token).put(`${base}/logo`, { fileId: up.fileId })).status, 200);
+    const info = (await api(t, a.token).get(`${base}/info`)).body;
+    assert.equal(info.theme, 'sunset');
+    assert.equal(info.hasLogo, true);
+    const logo = await fetch(t.baseUrl + `/classes/${c.id}/channel/logo`, { headers: { authorization: 'Bearer ' + a.token } });
+    assert.equal(logo.status, 200);
+    assert.equal(logo.headers.get('content-type'), 'image/webp');
+    assert.equal((await fetch(t.baseUrl + `/classes/${c.id}/channel/logo`, { headers: { authorization: 'Bearer ' + stranger.token } })).status, 404);
+    const members = (await api(t, a.token).get(`${base}/members`)).body.items;
+    assert.equal(members.length, 3);
+    assert.equal(members[0].teacher, true);
+    assert.equal(members.filter((m: any) => m.me).length, 1);
+    assert.equal((await api(t, stranger.token).get(`${base}/members`)).status, 404);
   });
 
   it('teacher and pupils write; strangers get 404; messages come back in order with author names', async () => {

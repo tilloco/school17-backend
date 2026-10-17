@@ -26,6 +26,7 @@ class ClassDto {
   @IsOptional() @IsIn(['OPEN', 'OFF']) questionsMode?: 'OPEN' | 'OFF';
   @IsOptional() @IsBoolean() allowDownload?: boolean;
   @IsOptional() @IsBoolean() protectContent?: boolean;
+  @IsOptional() @IsString() @MaxLength(20) theme?: string;
   @IsOptional() @IsBoolean() requirePaidToJoin?: boolean;
   @IsOptional() @IsBoolean() firstSessionTrial?: boolean;
 }
@@ -43,6 +44,7 @@ class UpdateClassDto {
   @IsOptional() @IsBoolean() handRaiseOn?: boolean;
   @IsOptional() @IsBoolean() allowDownload?: boolean;
   @IsOptional() @IsBoolean() protectContent?: boolean;
+  @IsOptional() @IsString() @MaxLength(20) theme?: string;
   @IsOptional() @IsBoolean() requirePaidToJoin?: boolean;
   @IsOptional() @IsBoolean() firstSessionTrial?: boolean;
 }

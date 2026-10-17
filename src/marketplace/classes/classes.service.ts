@@ -35,6 +35,7 @@ export interface ClassInput {
   handRaiseOn?: boolean;
   allowDownload?: boolean;
   protectContent?: boolean;
+  theme?: string;
   requirePaidToJoin?: boolean;
   firstSessionTrial?: boolean;
 }
@@ -139,10 +140,11 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     const { c } = await this.ownClass(actor, id);
     if (c.status === 'CANCELLED') throw new ConflictException('Class is cancelled');
     this.validate(input as ClassInput, true);
+    if (input.theme !== undefined && !['ocean', 'sunset', 'forest', 'lavender', 'rose', 'midnight', 'mint', 'gold', 'slate', 'candy'].includes(input.theme)) throw new BadRequestException('Unknown theme');
     if (input.capacity !== undefined && input.capacity < c.enrolledCount) throw new ConflictException({ message: 'Capacity is below the number of enrolled pupils', code: 'CAPACITY_BELOW_ENROLLED' });
     const data: Prisma.ClassUpdateInput = {};
     for (const k of ['title', 'subject', 'description'] as const) if (input[k] !== undefined) data[k] = String(input[k]).trim();
-    for (const k of ['capacity', 'priceMinor', 'priceModel', 'stageMode', 'chatMode', 'questionsMode', 'slowModeSeconds', 'handRaiseOn', 'allowDownload', 'protectContent', 'requirePaidToJoin', 'firstSessionTrial'] as const) if (input[k] !== undefined) (data as any)[k] = input[k];
+    for (const k of ['capacity', 'priceMinor', 'priceModel', 'stageMode', 'chatMode', 'questionsMode', 'slowModeSeconds', 'handRaiseOn', 'allowDownload', 'protectContent', 'theme', 'requirePaidToJoin', 'firstSessionTrial'] as const) if (input[k] !== undefined) (data as any)[k] = input[k];
     await this.prisma.class.update({ where: { id }, data });
     // Rejim o'zgarsa kelajakdagi (hali boshlanmagan) seanslar ham yangilanadi
     if (input.slowModeSeconds !== undefined && (!Number.isInteger(input.slowModeSeconds) || input.slowModeSeconds < 0 || input.slowModeSeconds > 600)) throw new BadRequestException('Slow mode must be 0..600 seconds');
@@ -337,7 +339,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     return {
       id: c.id, title: c.title, subject: c.subject, description: c.description, capacity: c.capacity, priceMinor: c.priceMinor, priceModel: c.priceModel,
       weekdays: c.weekdays, startMinute: c.startMinute, durationMin: c.durationMin, timezone: c.timezone, startDate: c.startDate, endDate: c.endDate, oneOffStartAt: c.oneOffStartAt,
-      stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode, slowModeSeconds: c.slowModeSeconds, handRaiseOn: c.handRaiseOn, protectContent: c.protectContent, allowDownload: c.allowDownload, requirePaidToJoin: c.requirePaidToJoin, firstSessionTrial: c.firstSessionTrial, status: c.status,
+      stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode, slowModeSeconds: c.slowModeSeconds, handRaiseOn: c.handRaiseOn, protectContent: c.protectContent, theme: c.theme, hasLogo: !!c.logoFileId, allowDownload: c.allowDownload, requirePaidToJoin: c.requirePaidToJoin, firstSessionTrial: c.firstSessionTrial, status: c.status,
     };
   }
 

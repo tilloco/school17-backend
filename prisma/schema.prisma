@@ -1192,6 +1192,8 @@ model Class {
   slowModeSeconds   Int                @default(0)
   handRaiseOn       Boolean            @default(true)
   allowDownload     Boolean            @default(true)
+  theme             String             @default("ocean") // kanal rang mavzusi (hamma ko'radi)
+  logoFileId        String? // kanal logosi (o'qituvchi yuklaydi)
   protectContent    Boolean            @default(false) // o'qituvchi yoqadi: a'zolar uchun skrinshot/yozib olish yopiq, PDF va fayllar yuklanmaydi, xabarlarni nusxalab/ulashib bo'lmaydi
   requirePaidToJoin Boolean            @default(false)
   firstSessionTrial Boolean            @default(false)
@@ -1569,6 +1571,7 @@ model ClassChannelPost {
   fileId    String?   @unique
   createdAt DateTime  @default(now())
   deletedAt DateTime?
+  replyToId String? // javob berilgan xabar (Telegram kabi)
   pinnedAt  DateTime? // o'qituvchi mahkamlagan xabar (Telegram kabi); bitta sinfda ko'p bo'lishi mumkin
 
   @@index([classId, seq])
