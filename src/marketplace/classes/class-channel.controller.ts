@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { Actor } from '../common/actor';
@@ -23,6 +23,18 @@ export class ClassChannelController {
   @Throttle({ default: { limit: 40, ttl: 60_000 } })
   @Post() @HttpCode(201) @RequirePermission('class.read')
   post(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PostDto) { return this.channel.post(a, id, dto); }
+
+  @Get('pins') @RequirePermission('class.read')
+  pins(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.channel.pins(a, id); }
+
+  @Get('info') @RequirePermission('class.read')
+  info(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) { return this.channel.info(a, id); }
+
+  @Put(':pid/pin') @HttpCode(200) @RequirePermission('class.read')
+  pin(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('pid', ParseUUIDPipe) pid: string) { return this.channel.pin(a, id, pid, true); }
+
+  @Delete(':pid/pin') @RequirePermission('class.read')
+  unpin(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('pid', ParseUUIDPipe) pid: string) { return this.channel.pin(a, id, pid, false); }
 
   @Delete(':pid') @RequirePermission('class.read')
   remove(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('pid', ParseUUIDPipe) pid: string) { return this.channel.remove(a, id, pid); }

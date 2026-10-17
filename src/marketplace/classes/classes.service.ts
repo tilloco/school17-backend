@@ -255,7 +255,6 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     if (actor.role === Role.STUDENT) {
       if (studentIdIn && studentIdIn !== actor.id) throw new ForbiddenException('Forbidden');
       if (!actor.ageKnown) throw new ForbiddenException('Date of birth required');
-      if (actor.isMinor) throw new ForbiddenException('A guardian must enroll minors');
       studentId = actor.id;
     } else if (actor.role === Role.GUARDIAN) {
       if (!studentIdIn) throw new BadRequestException('studentId required');

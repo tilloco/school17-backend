@@ -167,7 +167,7 @@ describe('safety: guardians, blocks, reports, consents (integration)', () => {
     assert.equal(locked.status, 429, 'even the correct code is refused while locked out');
   });
 
-  it('minor pupils: messaging needs an ACTIVE guardian; no contact details in either direction; adults may share', async () => {
+  it('minor pupils: a guardian is optional; no contact details in either direction; adults may share', async () => {
     const x = await minorSetup();
     assert.equal((await send(x.minor, x.threadId, 'Salom, ustoz')).status, 201);
     assert.equal((await send(x.tch.user, x.threadId, 'Salom!')).status, 201);
@@ -179,12 +179,11 @@ describe('safety: guardians, blocks, reports, consents (integration)', () => {
       }
     }
     assert.equal((await send(x.tch.user, x.threadId, 'Bugun 3-mavzu, 12 + 34 = 46, 2026-11-03 14:30')).status, 201, 'ordinary lesson text passes');
-    // vasiy o'chirilsa — yozishmalar to'xtaydi
+    // vasiy majburiy emas: o'chirilsa ham yozishmalar davom etadi (aloqa ma'lumoti taqiqi saqlanadi)
     await api(t, x.guardian.token).del('/guardian/children/' + x.minor.id);
-    const stopped = await send(x.minor, x.threadId, 'Salom');
-    assert.equal(stopped.status, 403);
-    assert.equal(stopped.body.code, 'GUARDIAN_REQUIRED');
-    assert.equal((await send(x.tch.user, x.threadId, 'Salom')).status, 403);
+    assert.equal((await send(x.minor, x.threadId, 'Salom')).status, 201);
+    assert.equal((await send(x.tch.user, x.threadId, 'Salom')).status, 201);
+    assert.equal((await send(x.tch.user, x.threadId, 'Yozing: +998 90 123 45 67')).status, 400, 'contact details stay blocked without a guardian');
     // voyaga yetgan o'quvchi: aloqa ma'lumoti taqiqlanmaydi
     const adultTch = await teacher();
     const adult = await makeUser(t);
@@ -193,7 +192,8 @@ describe('safety: guardians, blocks, reports, consents (integration)', () => {
     // tug'ilgan sana noma'lum => ehtiyotkorlik bilan voyaga yetmagan deb hisoblanadi
     const unknown = await makeUser(t, Role.STUDENT, { dateOfBirth: null });
     const tid = (await t.prisma.chatThread.create({ data: { teacherUserId: adultTch.user.id, studentUserId: unknown.id } })).id;
-    assert.equal((await send(unknown, tid, 'hello')).body.code, 'GUARDIAN_REQUIRED');
+    assert.equal((await send(unknown, tid, 'hello')).status, 201, 'unknown age: no guardian needed, contact details still blocked');
+    assert.equal((await send(unknown, tid, 'mening raqamim +998 90 123 45 67')).status, 400);
   });
 
   it('block: pupil blocks a teacher => no messages, no bookings, hidden from search; unblock restores; IDOR-safe', async () => {

@@ -1569,8 +1569,10 @@ model ClassChannelPost {
   fileId    String?   @unique
   createdAt DateTime  @default(now())
   deletedAt DateTime?
+  pinnedAt  DateTime? // o'qituvchi mahkamlagan xabar (Telegram kabi); bitta sinfda ko'p bo'lishi mumkin
 
   @@index([classId, seq])
+  @@index([classId, pinnedAt])
 }
 
 // O'qituvchi haqida ommaviy izoh: yulduzsiz, sharhdan (Review) farqli — sharhni faqat dars olgan o'quvchi qoldiradi. Har kishi bittadan.

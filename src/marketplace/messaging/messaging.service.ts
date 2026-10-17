@@ -181,7 +181,7 @@ export class MessagingService {
     if (!pupil || pupil.status !== 'ACTIVE') throw new ConflictException('Recipient unavailable');
     const minor = pupil?.dateOfBirth ? ageInYears(pupil.dateOfBirth, this.clock.now()) < ADULT_AGE : true; // sana noma'lum => ehtiyotkorlik bilan voyaga yetmagan deb hisoblaymiz
     if (minor) {
-      if ((await this.guardians.guardianIdsOf(t.studentUserId)).length === 0) throw new ForbiddenException({ message: 'A linked guardian is required for pupils under 18', code: 'GUARDIAN_REQUIRED' });
+      // Vasiy MAJBURIY EMAS (egasining qarori): bog'langan bo'lsa u kuzatuvchi bo'ladi; aloqa ma'lumotlari baribir taqiqlanadi
       const found = detectContactInfo(body);
       if (found.found) throw new BadRequestException({ message: "For safety, contact details can't be shared in chats with pupils under 18", code: 'CONTACT_INFO_NOT_ALLOWED', kinds: found.kinds });
     }

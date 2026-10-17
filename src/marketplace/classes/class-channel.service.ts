@@ -7,6 +7,7 @@ import { RealtimeService } from '../messaging/realtime.service';
 import { detectContactInfo } from '../safety/contact-info';
 
 export const CHANNEL_MAX_CHARS = 2000;
+const MAX_PINS = 100;
 const PAGE = 50;
 
 /**
@@ -28,7 +29,7 @@ export class ClassChannelService {
     throw new NotFoundException('Class not found');
   }
 
-  private async view(actor: Actor, teacherUserId: string, rows: { id: string; seq: number; authorId: string; body: string; fileId: string | null; createdAt: Date }[]) {
+  private async view(actor: Actor, teacherUserId: string, rows: { id: string; seq: number; authorId: string; body: string; fileId: string | null; createdAt: Date; pinnedAt?: Date | null }[]) {
     const authors = await this.prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.authorId))] } }, select: { id: true, name: true, username: true, dateOfBirth: true, avatarFileId: true } });
     const names = new Map(authors.map((a) => [a.id, a.name]));
     const info = new Map(authors.map((a) => [a.id, a]));
@@ -40,7 +41,7 @@ export class ClassChannelService {
       const f: StoredFile | undefined = r.fileId ? byId.get(r.fileId) : undefined;
       const mime = f?.finalMime ?? f?.mime ?? '';
       return {
-        id: r.id, seq: r.seq, at: r.createdAt, body: r.body, mine: r.authorId === actor.id,
+        id: r.id, seq: r.seq, at: r.createdAt, body: r.body, mine: r.authorId === actor.id, pinned: !!r.pinnedAt,
         // a minor's @username, photo and id are shown only to the class teacher (and to the minor); classmates see the name only
         author: (() => {
           const a = info.get(r.authorId);
@@ -103,6 +104,50 @@ export class ClassChannelService {
     const members = await this.prisma.classEnrollment.findMany({ where: { classId, status: 'ACTIVE' }, select: { pupilId: true } });
     for (const u of [c.teacherUserId, ...members.map((m) => m.pupilId)]) if (u !== actor.id) this.realtime.emitToUser(u, 'class.channel', { classId, seq: row.seq });
     return item;
+  }
+
+  /** Mahkamlangan xabarlar (yangisi birinchi). Bir sinfda 100 tagacha: chegara ilovada ko'rsatilmaydi. */
+  async pins(actor: Actor, classId: string) {
+    const c = await this.ctx(actor, classId);
+    const rows = await this.prisma.classChannelPost.findMany({ where: { classId, deletedAt: null, pinnedAt: { not: null } }, orderBy: { pinnedAt: 'desc' }, take: MAX_PINS });
+    return { items: await this.view(actor, c.teacherUserId, rows) };
+  }
+
+  async pin(actor: Actor, classId: string, postId: string, on: boolean) {
+    const c = await this.ctx(actor, classId);
+    if (!c.teacher) throw new ForbiddenException('Only the teacher can pin messages');
+    const p = await this.prisma.classChannelPost.findFirst({ where: { id: postId, classId, deletedAt: null } });
+    if (!p) throw new NotFoundException('Message not found');
+    if (on && !p.pinnedAt) {
+      const n = await this.prisma.classChannelPost.count({ where: { classId, deletedAt: null, pinnedAt: { not: null } } });
+      if (n >= MAX_PINS) throw new ConflictException({ message: 'Unpin an older message first', code: 'PIN_LIMIT' });
+    }
+    await this.prisma.classChannelPost.update({ where: { id: p.id }, data: { pinnedAt: on ? this.clock.now() : null } });
+    const members = await this.prisma.classEnrollment.findMany({ where: { classId, status: 'ACTIVE' }, select: { pupilId: true } });
+    for (const u of members) this.realtime.emitToUser(u.pupilId, 'class.channel', { classId, seq: p.seq, pin: true });
+    return { ok: true, pinned: on };
+  }
+
+  /** Kanal haqida: nom, o'qituvchi (logo = uning rasmi), tavsif, darslar, fayllar, himoya holati. */
+  async info(actor: Actor, classId: string) {
+    const c = await this.ctx(actor, classId);
+    const cls = await this.prisma.class.findUniqueOrThrow({
+      where: { id: classId },
+      select: { id: true, title: true, subject: true, description: true, priceMinor: true, capacity: true, enrolledCount: true, protectContent: true, startDate: true, endDate: true, weekdays: true, startMinute: true, durationMin: true, timezone: true, createdAt: true, teacher: { select: { userId: true, headline: true, subjects: true, user: { select: { name: true, username: true, bio: true, avatarFileId: true } } } } },
+    });
+    const now = this.clock.now();
+    const [upcoming, files, pins] = await Promise.all([
+      this.prisma.classSession.findMany({ where: { classId, startAt: { gte: now }, status: { notIn: ['CANCELLED'] } }, orderBy: { startAt: 'asc' }, take: 5, select: { id: true, startAt: true, endAt: true, status: true } }),
+      this.prisma.classFile.count({ where: { classId, deletedAt: null, takedownAt: null } }),
+      this.prisma.classChannelPost.count({ where: { classId, deletedAt: null, pinnedAt: { not: null } } }),
+    ]);
+    const t = cls.teacher;
+    return {
+      id: cls.id, title: cls.title, subject: cls.subject, description: cls.description, priceMinor: cls.priceMinor, members: cls.enrolledCount + 1, createdAt: cls.createdAt,
+      protectContent: cls.protectContent, role: c.teacher ? 'teacher' : 'pupil', startDate: cls.startDate, endDate: cls.endDate, weekdays: cls.weekdays, startMinute: cls.startMinute, durationMin: cls.durationMin, timezone: cls.timezone,
+      teacher: { id: t.userId, name: t.user.name, username: t.user.username, bio: t.user.bio ?? t.headline ?? null, subjects: t.subjects, hasPhoto: !!t.user.avatarFileId },
+      upcoming, filesCount: files, pinsCount: pins,
+    };
   }
 
   async remove(actor: Actor, classId: string, postId: string) {

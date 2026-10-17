@@ -117,14 +117,16 @@ describe('classes: model and enrollment (R1, integration)', () => {
     assert.equal(res.filter((r) => r.status === 409).length, 1);
   });
 
-  it('minors: only through a linked guardian; adults cannot be enrolled by a guardian; block and removal prevent enrollment', async () => {
+  it('minors: alone or through a linked guardian; adults cannot be enrolled by a guardian; block and removal prevent enrollment', async () => {
     const x = await teacher();
     const c = await mkClass(x);
     const minor = await makeUser(t, Role.STUDENT, { dateOfBirth: '2012-05-05', name: 'Aziz Karimov' });
     const guardian = await makeUser(t, Role.GUARDIAN);
     const stranger = await makeUser(t, Role.GUARDIAN);
     await t.prisma.guardianLink.create({ data: { guardianId: guardian.id, studentId: minor.id, status: 'ACTIVE' } });
-    assert.equal((await api(t, minor.token).post('/classes/join', { code: c.joinCode })).status, 403, 'minor alone');
+    const solo = await makeUser(t, Role.STUDENT, { dateOfBirth: '2012-05-05', name: 'Solo Pupil' });
+    const c2 = await mkClass(x);
+    assert.equal((await api(t, solo.token).post('/classes/join', { code: c2.joinCode })).status, 200, 'a teen can join alone: a guardian is optional');
     assert.equal((await api(t, stranger.token).post('/classes/join', { code: c.joinCode, studentId: minor.id })).status, 404, 'not his child');
     assert.equal((await api(t, guardian.token).post('/classes/join', { code: c.joinCode })).status, 400, 'studentId required');
     const ok = await api(t, guardian.token).post('/classes/join', { code: c.joinCode, studentId: minor.id });

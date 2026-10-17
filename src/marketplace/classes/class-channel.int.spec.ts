@@ -40,6 +40,41 @@ describe('class channel (everyone in the class writes, integration)', () => {
     assert.equal(await t.prisma.notification.count({ where: { userId: a.id, type: 'class.session_added' } }), 1);
   });
 
+  it('pins: only the teacher pins (many), everyone sees them, the list is newest first; the 101st pin needs an unpin; info shows teacher, lessons and the protection flag', async () => {
+    const { x, a, stranger, base, c } = await setup();
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) ids.push((await api(t, x.user.token).post(base, { body: `Rule ${i}` })).body.id);
+    const mine = (await api(t, a.token).post(base, { body: 'my question' })).body.id;
+    assert.equal((await api(t, a.token).put(`${base}/${ids[0]}/pin`)).status, 403, 'a pupil cannot pin');
+    assert.equal((await api(t, stranger.token).put(`${base}/${ids[0]}/pin`)).status, 404);
+    for (const id of ids) assert.equal((await api(t, x.user.token).put(`${base}/${id}/pin`)).status, 200);
+    const pins = (await api(t, a.token).get(`${base}/pins`)).body.items;
+    assert.deepEqual(pins.map((p: any) => p.body), ['Rule 2', 'Rule 1', 'Rule 0']);
+    assert.equal(pins[0].pinned, true);
+    assert.equal((await api(t, a.token).get(base)).body.items.find((m: any) => m.id === mine).pinned, false);
+    assert.equal((await api(t, x.user.token).del(`${base}/${ids[1]}/pin`)).status, 200);
+    assert.equal((await api(t, a.token).get(`${base}/pins`)).body.items.length, 2);
+    // 100 ta chegara: 101-chisi uchun eskisini olib tashlash kerak
+    const rows = Array.from({ length: 97 }, (_, i) => ({ classId: c.id, authorId: x.user.id, body: `bulk ${i}`, pinnedAt: new Date(Date.now() - i * 1000) }));
+    await t.prisma.classChannelPost.createMany({ data: rows });
+    assert.equal((await api(t, x.user.token).put(`${base}/${ids[1]}/pin`)).status, 200, 'the 100th pin');
+    const extra = (await api(t, x.user.token).post(base, { body: 'one more' })).body.id;
+    const over = await api(t, x.user.token).put(`${base}/${extra}/pin`);
+    assert.equal(over.status, 409);
+    assert.equal(over.body.code, 'PIN_LIMIT');
+    // kanal haqida
+    await api(t, x.user.token).post(`/classes/${c.id}/sessions`, { startAt: new Date(Date.now() + 86_400_000).toISOString(), durationMin: 45 });
+    await api(t, x.user.token).patch(`/classes/${c.id}`, { protectContent: true });
+    const info = (await api(t, a.token).get(`${base}/info`)).body;
+    assert.equal(info.title, 'Math');
+    assert.equal(info.protectContent, true);
+    assert.equal(info.role, 'pupil');
+    assert.equal(info.teacher.id, x.user.id);
+    assert.equal(info.upcoming.length, 1);
+    assert.equal(info.pinsCount, 100);
+    assert.equal((await api(t, stranger.token).get(`${base}/info`)).status, 404);
+  });
+
   it('teacher and pupils write; strangers get 404; messages come back in order with author names', async () => {
     const { x, a, b, stranger, base } = await setup();
     assert.equal((await api(t, x.user.token).post(base, { body: 'Welcome to the class!' })).status, 201);
