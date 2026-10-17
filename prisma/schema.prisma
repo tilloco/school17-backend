@@ -1192,6 +1192,7 @@ model Class {
   slowModeSeconds   Int                @default(0)
   handRaiseOn       Boolean            @default(true)
   allowDownload     Boolean            @default(true)
+  protectContent    Boolean            @default(false) // o'qituvchi yoqadi: a'zolar uchun skrinshot/yozib olish yopiq, PDF va fayllar yuklanmaydi, xabarlarni nusxalab/ulashib bo'lmaydi
   requirePaidToJoin Boolean            @default(false)
   firstSessionTrial Boolean            @default(false)
   status            ClassStatus        @default(ACTIVE)

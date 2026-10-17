@@ -58,6 +58,25 @@ describe('class PDF presenter and library (R5, integration)', () => {
     await t.close();
   });
 
+  it('protected class: members cannot download files or non-image channel attachments; the teacher still can; switching it off restores access', async () => {
+    const { x, c, ps } = await klass(1);
+    const bytes = Buffer.from('secret paid material '.repeat(40));
+    const up = await uploadFile(t, x.user, { purpose: 'CLASS_FILE', name: 'paid.zip', mime: 'application/zip', bytes });
+    const r = await api(t, x.user.token).post(`/classes/${c.id}/files`, { fileId: up.fileId });
+    assert.equal(r.status, 201);
+    const dl = (u: TestUser) => api(t, u.token).post(`/classes/${c.id}/files/${r.body.id}/download-url`, {});
+    assert.equal((await dl(ps[0])).status, 200, 'open by default');
+    assert.equal((await api(t, x.user.token).patch(`/classes/${c.id}`, { protectContent: true })).status, 200);
+    assert.equal((await api(t, ps[0].token).get(`/classes/${c.id}`)).body.protectContent, true, 'members can read the flag (the app blocks screenshots)');
+    const blocked = await dl(ps[0]);
+    assert.equal(blocked.status, 403);
+    assert.equal(blocked.body.code, 'DOWNLOAD_OFF');
+    assert.equal((await api(t, ps[0].token).post('/files/' + up.fileId + '/download-url', {})).status, 404, 'no way around it through the generic file route');
+    assert.equal((await dl(x.user)).status, 200, 'the teacher keeps access');
+    assert.equal((await api(t, x.user.token).patch(`/classes/${c.id}`, { protectContent: false })).status, 200);
+    assert.equal((await dl(ps[0])).status, 200);
+  });
+
   it('any file type in a class: a zip lands as ready (no pages), pupils list and download it', async () => {
     const { x, c, ps } = await klass(1);
     const bytes = Buffer.from('PK-not-really-a-zip-but-any-bytes-are-fine'.repeat(50));

@@ -25,6 +25,7 @@ class ClassDto {
   @IsOptional() @IsIn(['OPEN', 'QUESTIONS_ONLY', 'OFF']) chatMode?: 'OPEN' | 'QUESTIONS_ONLY' | 'OFF';
   @IsOptional() @IsIn(['OPEN', 'OFF']) questionsMode?: 'OPEN' | 'OFF';
   @IsOptional() @IsBoolean() allowDownload?: boolean;
+  @IsOptional() @IsBoolean() protectContent?: boolean;
   @IsOptional() @IsBoolean() requirePaidToJoin?: boolean;
   @IsOptional() @IsBoolean() firstSessionTrial?: boolean;
 }
@@ -41,6 +42,7 @@ class UpdateClassDto {
   @IsOptional() @IsInt() @Min(0) @Max(600) slowModeSeconds?: number;
   @IsOptional() @IsBoolean() handRaiseOn?: boolean;
   @IsOptional() @IsBoolean() allowDownload?: boolean;
+  @IsOptional() @IsBoolean() protectContent?: boolean;
   @IsOptional() @IsBoolean() requirePaidToJoin?: boolean;
   @IsOptional() @IsBoolean() firstSessionTrial?: boolean;
 }

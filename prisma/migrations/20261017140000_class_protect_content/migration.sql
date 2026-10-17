@@ -1,0 +1,1 @@
+ALTER TABLE "Class" ADD COLUMN "protectContent" BOOLEAN NOT NULL DEFAULT false;

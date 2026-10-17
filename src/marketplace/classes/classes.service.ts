@@ -34,6 +34,7 @@ export interface ClassInput {
   slowModeSeconds?: number;
   handRaiseOn?: boolean;
   allowDownload?: boolean;
+  protectContent?: boolean;
   requirePaidToJoin?: boolean;
   firstSessionTrial?: boolean;
 }
@@ -120,7 +121,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
             priceMinor: input.priceMinor ?? 0, priceModel: input.priceModel ?? 'PER_SESSION', weekdays: oneOff ? [] : input.weekdays ?? [], startMinute: input.startMinute ?? 0,
             durationMin: input.durationMin ?? 60, timezone: tz, startDate, endDate, oneOffStartAt: oneOff,
             stageMode: input.stageMode ?? 'HAND_RAISE', chatMode: input.chatMode ?? 'OPEN', questionsMode: input.questionsMode ?? 'OPEN',
-            allowDownload: input.allowDownload ?? true, requirePaidToJoin: input.requirePaidToJoin ?? false, firstSessionTrial: input.firstSessionTrial ?? false,
+            allowDownload: input.allowDownload ?? true, protectContent: input.protectContent ?? false, requirePaidToJoin: input.requirePaidToJoin ?? false, firstSessionTrial: input.firstSessionTrial ?? false,
             codeHash: hashSecret(code), inviteHash: hashSecret(invite),
           },
         });
@@ -141,7 +142,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     if (input.capacity !== undefined && input.capacity < c.enrolledCount) throw new ConflictException({ message: 'Capacity is below the number of enrolled pupils', code: 'CAPACITY_BELOW_ENROLLED' });
     const data: Prisma.ClassUpdateInput = {};
     for (const k of ['title', 'subject', 'description'] as const) if (input[k] !== undefined) data[k] = String(input[k]).trim();
-    for (const k of ['capacity', 'priceMinor', 'priceModel', 'stageMode', 'chatMode', 'questionsMode', 'slowModeSeconds', 'handRaiseOn', 'allowDownload', 'requirePaidToJoin', 'firstSessionTrial'] as const) if (input[k] !== undefined) (data as any)[k] = input[k];
+    for (const k of ['capacity', 'priceMinor', 'priceModel', 'stageMode', 'chatMode', 'questionsMode', 'slowModeSeconds', 'handRaiseOn', 'allowDownload', 'protectContent', 'requirePaidToJoin', 'firstSessionTrial'] as const) if (input[k] !== undefined) (data as any)[k] = input[k];
     await this.prisma.class.update({ where: { id }, data });
     // Rejim o'zgarsa kelajakdagi (hali boshlanmagan) seanslar ham yangilanadi
     if (input.slowModeSeconds !== undefined && (!Number.isInteger(input.slowModeSeconds) || input.slowModeSeconds < 0 || input.slowModeSeconds > 600)) throw new BadRequestException('Slow mode must be 0..600 seconds');
@@ -337,7 +338,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     return {
       id: c.id, title: c.title, subject: c.subject, description: c.description, capacity: c.capacity, priceMinor: c.priceMinor, priceModel: c.priceModel,
       weekdays: c.weekdays, startMinute: c.startMinute, durationMin: c.durationMin, timezone: c.timezone, startDate: c.startDate, endDate: c.endDate, oneOffStartAt: c.oneOffStartAt,
-      stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode, slowModeSeconds: c.slowModeSeconds, handRaiseOn: c.handRaiseOn, allowDownload: c.allowDownload, requirePaidToJoin: c.requirePaidToJoin, firstSessionTrial: c.firstSessionTrial, status: c.status,
+      stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode, slowModeSeconds: c.slowModeSeconds, handRaiseOn: c.handRaiseOn, protectContent: c.protectContent, allowDownload: c.allowDownload, requirePaidToJoin: c.requirePaidToJoin, firstSessionTrial: c.firstSessionTrial, status: c.status,
     };
   }
 

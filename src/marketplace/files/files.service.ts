@@ -254,6 +254,7 @@ export class FilesService {
       // Sinf PDF'ini asl holida faqat o'qituvchi (egasi) yoki, agar o'qituvchi ruxsat bergan bo'lsa, sinf a'zolari yuklab oladi
       const cf = await this.prisma.classFile.findFirst({ where: { fileId: file.id, deletedAt: null, takedownAt: null, allowDownload: true }, select: { classId: true } });
       if (!cf) return false;
+      if ((await this.prisma.class.findUnique({ where: { id: cf.classId }, select: { protectContent: true } }))?.protectContent) return false; // himoyalangan sinf: faqat o'qituvchi (egasi) yuklab oladi
       const seats = actor.role === 'GUARDIAN' ? await this.guardians.linkedStudentIds(actor.id) : [actor.id];
       return !!(await this.prisma.classEnrollment.findFirst({ where: { classId: cf.classId, pupilId: { in: seats }, status: 'ACTIVE' }, select: { id: true } }));
     }
@@ -274,6 +275,8 @@ export class FilesService {
     if (!post || post.deletedAt) return false;
     const c = await this.prisma.class.findUnique({ where: { id: post.classId }, select: { teacher: { select: { userId: true } } } });
     if (c?.teacher.userId === actor.id) return true;
+    // Himoyalangan sinfda a'zolar kanaldagi rasmlarni ko'ra oladi, boshqa fayllarni (PDF va h.k.) yuklab ololmaydi
+    if ((await this.prisma.class.findUnique({ where: { id: post.classId }, select: { protectContent: true } }))?.protectContent && !(file.finalMime ?? '').startsWith('image/')) return false;
     return !!(await this.prisma.classEnrollment.findFirst({ where: { classId: post.classId, pupilId: actor.id, status: 'ACTIVE' }, select: { id: true } }));
   }
 

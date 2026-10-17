@@ -133,7 +133,8 @@ export class ClassFilesService implements OnModuleInit {
   async downloadUrl(actor: Actor, classId: string, id: string) {
     const { teacher } = await this.memberOf(actor, classId);
     const f = await this.fileIn(classId, id);
-    if (!teacher && !f.allowDownload) throw new ForbiddenException({ message: 'The teacher did not allow downloads', code: 'DOWNLOAD_OFF' });
+    const protectedClass = !teacher && (await this.prisma.class.findUnique({ where: { id: classId }, select: { protectContent: true } }))?.protectContent;
+    if (!teacher && (!f.allowDownload || protectedClass)) throw new ForbiddenException({ message: 'The teacher did not allow downloads', code: 'DOWNLOAD_OFF' });
     return this.files.downloadUrl(actor, f.fileId, 'original');
   }
 
