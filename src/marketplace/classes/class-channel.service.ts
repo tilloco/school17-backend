@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Role, StoredFile } from '@prisma/client';
+import { ReportReason, Role, StoredFile } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Actor, ADULT_AGE, ageInYears } from '../common/actor';
 import { ClockService } from '../common/clock';
@@ -29,7 +29,7 @@ export class ClassChannelService {
     throw new NotFoundException('Class not found');
   }
 
-  private async view(actor: Actor, teacherUserId: string, rows: { id: string; seq: number; authorId: string; body: string; fileId: string | null; createdAt: Date; pinnedAt?: Date | null; replyToId?: string | null }[]) {
+  private async view(actor: Actor, teacherUserId: string, rows: { id: string; seq: number; authorId: string; body: string; fileId: string | null; createdAt: Date; pinnedAt?: Date | null; replyToId?: string | null; hiddenAt?: Date | null }[]) {
     const authors = await this.prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.authorId))] } }, select: { id: true, name: true, username: true, dateOfBirth: true, avatarFileId: true } });
     const names = new Map(authors.map((a) => [a.id, a.name]));
     const info = new Map(authors.map((a) => [a.id, a]));
@@ -37,12 +37,18 @@ export class ClassChannelService {
     const fileIds = rows.map((r) => r.fileId).filter((x): x is string => !!x);
     const files = fileIds.length ? await this.prisma.storedFile.findMany({ where: { id: { in: fileIds } } }) : [];
     const byId = new Map(files.map((f) => [f.id, f]));
+    const reportRows = rows.length ? await this.prisma.report.findMany({ where: { targetType: 'CHANNEL_POST', targetId: { in: rows.map((r) => r.id) }, status: 'OPEN' }, select: { targetId: true, reporterId: true } }) : [];
+    const teacherSeesAll = actor.id === teacherUserId;
+    const reportCount = new Map<string, number>();
+    const reportedByMe = new Set<string>();
+    for (const rp of reportRows) { reportCount.set(rp.targetId, (reportCount.get(rp.targetId) ?? 0) + 1); if (rp.reporterId === actor.id) reportedByMe.add(rp.targetId); }
     const replyIds = [...new Set(rows.map((r) => r.replyToId).filter((x): x is string => !!x))];
-    const replied = replyIds.length ? await this.prisma.classChannelPost.findMany({ where: { id: { in: replyIds } }, select: { id: true, body: true, authorId: true, fileId: true, deletedAt: true } }) : [];
+    const replied = replyIds.length ? await this.prisma.classChannelPost.findMany({ where: { id: { in: replyIds } }, select: { id: true, body: true, authorId: true, fileId: true, deletedAt: true, hiddenAt: true } }) : [];
     const repliedAuthors = replied.length ? await this.prisma.user.findMany({ where: { id: { in: [...new Set(replied.map((p) => p.authorId))] } }, select: { id: true, name: true } }) : [];
     const authorName = new Map(repliedAuthors.map((a) => [a.id, a.name]));
     const repliedBy = new Map(replied.map((p) => [p.id, p]));
     return rows.map((r) => {
+      const item = (() => {
       const f: StoredFile | undefined = r.fileId ? byId.get(r.fileId) : undefined;
       const mime = f?.finalMime ?? f?.mime ?? '';
       return {
@@ -50,7 +56,7 @@ export class ClassChannelService {
         replyTo: (() => {
           const o = r.replyToId ? repliedBy.get(r.replyToId) : undefined;
           if (!o) return null;
-          return o.deletedAt ? { id: o.id, deleted: true, body: '', author: null, hasFile: false } : { id: o.id, deleted: false, body: o.body.slice(0, 140), author: authorName.get(o.authorId) ?? null, hasFile: !!o.fileId };
+          return o.deletedAt || (o.hiddenAt && !teacherSeesAll) ? { id: o.id, deleted: true, body: '', author: null, hasFile: false } : { id: o.id, deleted: false, body: o.body.slice(0, 140), author: authorName.get(o.authorId) ?? null, hasFile: !!o.fileId };
         })(),
         // a minor's @username, photo and id are shown only to the class teacher (and to the minor); classmates see the name only
         author: (() => {
@@ -61,6 +67,11 @@ export class ClassChannelService {
         })(),
         file: f && !f.deletedAt ? { id: f.id, name: f.originalName, size: f.sizeBytes, mime, image: mime.startsWith('image/') } : null,
       };
+      })();
+      const mine = reportedByMe.has(r.id);
+      const hide = !teacherSeesAll && !item.mine && (mine || !!r.hiddenAt);
+      if (hide) return { ...item, body: '', file: null, replyTo: null, hidden: mine ? 'reported' : 'review', reports: 0 };
+      return { ...item, hidden: null as 'reported' | 'review' | null, reports: teacherSeesAll ? reportCount.get(r.id) ?? 0 : 0 };
     });
   }
 
@@ -162,6 +173,39 @@ export class ClassChannelService {
       teacher: { id: t.userId, name: t.user.name, username: t.user.username, bio: t.user.bio ?? t.headline ?? null, subjects: t.subjects, hasPhoto: !!t.user.avatarFileId },
       upcoming, filesCount: files, pinsCount: pins,
     };
+  }
+
+  /** Xabar yoki rasm ustidan shikoyat (spam, nomaqbul kontent...). Shikoyat qilgan odamga xabar darrov yashiriladi; 3 ta turli odam shikoyat qilsa hamma uchun vaqtincha yashiriladi. */
+  async report(actor: Actor, classId: string, postId: string, input: { reason: ReportReason; note?: string }) {
+    const c = await this.ctx(actor, classId);
+    const p = await this.prisma.classChannelPost.findFirst({ where: { id: postId, classId, deletedAt: null } });
+    if (!p) throw new NotFoundException('Message not found');
+    if (p.authorId === actor.id) throw new ForbiddenException('You cannot report your own message');
+    try {
+      await this.prisma.report.create({
+        data: {
+          reporterId: actor.id, targetType: 'CHANNEL_POST', targetId: p.id, reason: input.reason, note: (input.note ?? '').trim().slice(0, 500),
+          snapshot: { classId, authorId: p.authorId, body: p.body.slice(0, 1000), hasFile: !!p.fileId, fileId: p.fileId, at: p.createdAt } as any,
+        },
+      });
+    } catch (e: any) {
+      if (e?.code !== 'P2002') throw e; // allaqachon shikoyat qilgan: jim muvaffaqiyat
+    }
+    const distinct = await this.prisma.report.count({ where: { targetType: 'CHANNEL_POST', targetId: p.id, status: 'OPEN' } });
+    if (distinct >= 3 && !p.hiddenAt) await this.prisma.classChannelPost.update({ where: { id: p.id }, data: { hiddenAt: this.clock.now() } });
+    if (!c.teacher) this.realtime.emitToUser(c.teacherUserId, 'class.channel', { classId, seq: p.seq, report: true });
+    return { ok: true, hiddenForYou: true };
+  }
+
+  /** O'qituvchi: "xabar yaxshi" — shikoyatlarni yopadi va yashirishni olib tashlaydi. */
+  async clearReports(actor: Actor, classId: string, postId: string) {
+    const c = await this.ctx(actor, classId);
+    if (!c.teacher) throw new ForbiddenException('Only the teacher can do this');
+    const p = await this.prisma.classChannelPost.findFirst({ where: { id: postId, classId } });
+    if (!p) throw new NotFoundException('Message not found');
+    await this.prisma.report.updateMany({ where: { targetType: 'CHANNEL_POST', targetId: p.id, status: 'OPEN' }, data: { status: 'DISMISSED', resolvedAt: this.clock.now(), resolutionNote: 'teacher: message is fine' } });
+    await this.prisma.classChannelPost.update({ where: { id: p.id }, data: { hiddenAt: null } });
+    return { ok: true };
   }
 
   /** Kanal a'zolari (o'qituvchi + faol o'quvchilar). 18 yoshgacha bo'lganlarning id/@nom/rasmi faqat o'qituvchiga va o'ziga ko'rinadi. */

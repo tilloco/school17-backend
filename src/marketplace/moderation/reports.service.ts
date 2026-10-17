@@ -127,6 +127,7 @@ export class ReportsService {
     if (action === 'ACTION') {
       if (r.targetType === 'REVIEW') await this.reviews.setHidden(admin, r.targetId, true, note ?? `report:${r.reason}`);
       else if (r.targetType === 'COMMENT') await this.prisma.teacherComment.updateMany({ where: { id: r.targetId }, data: { hidden: true } });
+      else if (r.targetType === 'CHANNEL_POST') await this.prisma.classChannelPost.updateMany({ where: { id: r.targetId }, data: { deletedAt: this.clock.now() } });
       else if (r.targetType === 'MESSAGE') {
         await this.prisma.chatMessage.updateMany({ where: { id: r.targetId }, data: { deletedAt: this.clock.now() } });
         await this.prisma.classMessage.updateMany({ where: { id: r.targetId, deletedAt: null }, data: { deletedAt: this.clock.now() } }); // sinf chati (R3)
@@ -136,6 +137,7 @@ export class ReportsService {
       }
       else if (r.targetType === 'USER') await this.setUserSuspended(admin, r.targetId, true, note ?? `report:${r.reason}`);
     }
+    if (action === 'DISMISS' && r.targetType === 'CHANNEL_POST') await this.prisma.classChannelPost.updateMany({ where: { id: r.targetId }, data: { hiddenAt: null } });
     const updated = await this.prisma.report.update({
       where: { id: r.id },
       data: { status: action === 'ACTION' ? 'ACTIONED' : 'DISMISSED', resolutionNote: (note ?? '').slice(0, 500), resolvedByAdminId: admin.id, resolvedAt: this.clock.now() },

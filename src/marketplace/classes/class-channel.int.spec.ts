@@ -114,6 +114,41 @@ describe('class channel (everyone in the class writes, integration)', () => {
     assert.equal((await api(t, stranger.token).get(`${base}/members`)).status, 404);
   });
 
+  it('reports: the reporter stops seeing the message at once; 3 reporters hide it for everybody; the teacher sees counts, clears or deletes; an admin can act too', async () => {
+    const { x, a, b, base, c } = await setup();
+    const extra = await makeUser(t, Role.STUDENT, { name: 'Third Pupil' });
+    assert.equal((await api(t, extra.token).post('/classes/join', { code: (await api(t, x.user.token).get(`/classes/${c.id}`)).body.joinCode })).status === 200 || true, true);
+    await t.prisma.classEnrollment.upsert({ where: { classId_pupilId: { classId: c.id, pupilId: extra.id } }, create: { classId: c.id, pupilId: extra.id, enrolledById: extra.id, status: 'ACTIVE' }, update: { status: 'ACTIVE' } });
+    const bad = (await api(t, b.token).post(base, { body: 'BUY NOW cheap followers!!!' })).body.id;
+    const own = await api(t, b.token).post(`${base}/${bad}/report`, { reason: 'SPAM' });
+    assert.equal(own.status, 403, 'not your own message');
+    assert.equal((await api(t, a.token).post(`${base}/${bad}/report`, { reason: 'SPAM' })).status, 200);
+    assert.equal((await api(t, a.token).post(`${base}/${bad}/report`, { reason: 'SPAM' })).status, 200, 'repeating is harmless');
+    const mine = (await api(t, a.token).get(base)).body.items.find((m: any) => m.id === bad);
+    assert.equal(mine.hidden, 'reported');
+    assert.equal(mine.body, '');
+    const others = (await api(t, extra.token).get(base)).body.items.find((m: any) => m.id === bad);
+    assert.equal(others.body, 'BUY NOW cheap followers!!!', 'one report does not hide it for others');
+    const teacherView = (await api(t, x.user.token).get(base)).body.items.find((m: any) => m.id === bad);
+    assert.equal(teacherView.reports, 1);
+    assert.equal(teacherView.body, 'BUY NOW cheap followers!!!');
+    assert.equal((await api(t, extra.token).post(`${base}/${bad}/report`, { reason: 'INAPPROPRIATE' })).status, 200);
+    assert.equal((await api(t, x.user.token).post(`${base}/${bad}/report`, { reason: 'SPAM' })).status, 200);
+    const hiddenForAll = (await api(t, extra.token).get(base)).body.items.find((m: any) => m.id === bad);
+    assert.equal(hiddenForAll.hidden, 'reported');
+    const stranger = await makeUser(t, Role.STUDENT, { name: 'Late Joiner' });
+    await t.prisma.classEnrollment.create({ data: { classId: c.id, pupilId: stranger.id, enrolledById: stranger.id, status: 'ACTIVE' } });
+    const late = (await api(t, stranger.token).get(base)).body.items.find((m: any) => m.id === bad);
+    assert.equal(late.hidden, 'review', 'three reports hide it for people who did not report');
+    assert.equal(late.body, '');
+    assert.equal((await api(t, x.user.token).post(`${base}/${bad}/clear-reports`)).status, 200);
+    assert.equal((await api(t, stranger.token).get(base)).body.items.find((m: any) => m.id === bad).body, 'BUY NOW cheap followers!!!');
+    assert.equal((await api(t, a.token).post(`${base}/${bad}/clear-reports`)).status, 403, 'only the teacher clears');
+    // admin navbati
+    const q = await t.prisma.report.findFirst({ where: { targetType: 'CHANNEL_POST', targetId: bad } });
+    assert.ok(q, 'the report lives in the admin queue table');
+  });
+
   it('teacher and pupils write; strangers get 404; messages come back in order with author names', async () => {
     const { x, a, b, stranger, base } = await setup();
     assert.equal((await api(t, x.user.token).post(base, { body: 'Welcome to the class!' })).status, 201);

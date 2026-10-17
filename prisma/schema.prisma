@@ -880,6 +880,7 @@ enum ReportTargetType {
   USER
   MESSAGE
   CLASS_FILE
+  CHANNEL_POST
 }
 
 enum ReportReason {
@@ -1572,6 +1573,7 @@ model ClassChannelPost {
   createdAt DateTime  @default(now())
   deletedAt DateTime?
   replyToId String? // javob berilgan xabar (Telegram kabi)
+  hiddenAt  DateTime? // 3 ta shikoyatdan keyin vaqtincha yashiriladi (o'qituvchi/admin ko'rib chiqquncha)
   pinnedAt  DateTime? // o'qituvchi mahkamlagan xabar (Telegram kabi); bitta sinfda ko'p bo'lishi mumkin
 
   @@index([classId, seq])

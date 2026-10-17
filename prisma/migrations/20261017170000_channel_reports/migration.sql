@@ -1,0 +1,2 @@
+ALTER TYPE "ReportTargetType" ADD VALUE 'CHANNEL_POST';
+ALTER TABLE "ClassChannelPost" ADD COLUMN "hiddenAt" TIMESTAMP(3);

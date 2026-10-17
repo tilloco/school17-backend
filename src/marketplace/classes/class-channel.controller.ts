@@ -1,10 +1,16 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ReportReason } from '@prisma/client';
+import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { Actor } from '../common/actor';
 import { CurrentActor, RequirePermission, UserActorGuard } from '../common/actor.guard';
 import { FilesService } from '../files/files.service';
 import { ClassChannelService } from './class-channel.service';
+
+class ReportDto {
+  @IsIn(['SPAM', 'INAPPROPRIATE', 'ABUSE', 'PERSONAL_DATA', 'OTHER']) reason!: ReportReason;
+  @IsOptional() @IsString() @MaxLength(500) note?: string;
+}
 
 class LogoDto { @IsUUID() fileId!: string; }
 
@@ -54,6 +60,13 @@ export class ClassChannelController {
 
   @Put(':pid/pin') @HttpCode(200) @RequirePermission('class.read')
   pin(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('pid', ParseUUIDPipe) pid: string) { return this.channel.pin(a, id, pid, true); }
+
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Post(':pid/report') @HttpCode(200) @RequirePermission('class.read')
+  report(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('pid', ParseUUIDPipe) pid: string, @Body() dto: ReportDto) { return this.channel.report(a, id, pid, dto); }
+
+  @Post(':pid/clear-reports') @HttpCode(200) @RequirePermission('class.read')
+  clear(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('pid', ParseUUIDPipe) pid: string) { return this.channel.clearReports(a, id, pid); }
 
   @Delete(':pid/pin') @RequirePermission('class.read')
   unpin(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('pid', ParseUUIDPipe) pid: string) { return this.channel.pin(a, id, pid, false); }
