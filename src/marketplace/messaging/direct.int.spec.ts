@@ -90,6 +90,24 @@ describe('direct messages, avatars, class reviews and comment reports (integrati
     assert.equal(after.body.length, 0);
   });
 
+  it('replies in ordinary chats: a message can quote another one of the same chat; quotes of deleted messages are blank; other chats are refused', async () => {
+    const a = await named(Role.STUDENT, 'reply_a');
+    const b = await named(Role.STUDENT, 'reply_b');
+    const { x } = await classWith(a, b);
+    const th = (await api(t, a.token).post('/threads/direct', { userId: b.id })).body.id;
+    const q = (await api(t, a.token).post(`/threads/${th}/messages`, { body: 'Uy vazifasi nima edi?' })).body;
+    const r = await api(t, b.token).post(`/threads/${th}/messages`, { body: '5-mashq', replyToId: q.id });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal(r.body.replyTo.id, q.id);
+    assert.equal(r.body.replyTo.body, 'Uy vazifasi nima edi?');
+    assert.equal(r.body.replyTo.mine, false);
+    const list = (await api(t, a.token).get(`/threads/${th}/messages`)).body;
+    assert.equal(list[1].replyTo.mine, true, 'the quote knows whose message it was for the reader');
+    const other = (await api(t, a.token).post('/threads/direct', { userId: x.user.id })).body.id;
+    const foreign = (await api(t, a.token).post(`/threads/${other}/messages`, { body: 'salom' })).body.id;
+    assert.equal((await api(t, b.token).post(`/threads/${th}/messages`, { body: 'x', replyToId: foreign })).status, 404);
+  });
+
   it('message request: one message until accepted; replying accepts; declining stops it', async () => {
     const a = await named(Role.STUDENT, 'sender');
     const c = await named(Role.TEACHER, 'ustoz');

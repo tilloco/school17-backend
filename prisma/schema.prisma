@@ -836,6 +836,7 @@ model ChatMessage {
   body      String      @default("") @db.Text
   fileId    String?     @unique
   file      StoredFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  replyToId String? // javob berilgan xabar (shu suhbatdan)
   createdAt DateTime    @default(now())
   deletedAt DateTime?
 

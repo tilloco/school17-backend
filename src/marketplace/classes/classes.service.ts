@@ -9,6 +9,7 @@ import { GuardianService } from '../guardian/guardian.service';
 import { LegalService } from '../legal/legal.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { BlocksService } from '../safety/blocks.service';
+import { RealtimeService } from '../messaging/realtime.service';
 import { ClassRemindersService } from './class-reminders.service';
 import { firstName, hashSecret, newInviteToken, newJoinCode, normalizeCode, ScheduleInput, sessionTimes } from './class-rules';
 
@@ -53,6 +54,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     private blocks: BlocksService,
     private legal: LegalService,
     private reminders: ClassRemindersService,
+    private realtime: RealtimeService,
   ) {}
 
   onModuleInit() {
@@ -146,6 +148,10 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     for (const k of ['title', 'subject', 'description'] as const) if (input[k] !== undefined) data[k] = String(input[k]).trim();
     for (const k of ['capacity', 'priceMinor', 'priceModel', 'stageMode', 'chatMode', 'questionsMode', 'slowModeSeconds', 'handRaiseOn', 'allowDownload', 'protectContent', 'theme', 'requirePaidToJoin', 'firstSessionTrial'] as const) if (input[k] !== undefined) (data as any)[k] = input[k];
     await this.prisma.class.update({ where: { id }, data });
+    if (input.protectContent !== undefined && input.protectContent !== c.protectContent) {
+      const members = await this.prisma.classEnrollment.findMany({ where: { classId: id, status: 'ACTIVE' }, select: { pupilId: true } });
+      for (const m of members) this.realtime.emitToUser(m.pupilId, 'class.channel', { classId: id, protect: true });
+    }
     // Rejim o'zgarsa kelajakdagi (hali boshlanmagan) seanslar ham yangilanadi
     if (input.slowModeSeconds !== undefined && (!Number.isInteger(input.slowModeSeconds) || input.slowModeSeconds < 0 || input.slowModeSeconds > 600)) throw new BadRequestException('Slow mode must be 0..600 seconds');
     if (input.stageMode || input.chatMode || input.questionsMode || input.slowModeSeconds !== undefined || input.handRaiseOn !== undefined) {

@@ -23,6 +23,7 @@ class DirectDto {
 class SendDto {
   @IsOptional() @IsString() @MaxLength(2000) body?: string;
   @IsOptional() @IsUUID() fileId?: string;
+  @IsOptional() @IsUUID() replyToId?: string;
 }
 class SeqDto {
   @IsInt() @Min(0) @Max(2_000_000_000) upToSeq!: number;

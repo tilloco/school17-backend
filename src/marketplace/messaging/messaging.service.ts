@@ -137,7 +137,8 @@ export class MessagingService {
       include: { file: true },
     })) as MessageFull[];
     if (!opts.afterSeq) rows.reverse();
-    return rows.map((m) => this.messageView(actor, t, role, m));
+    const replies = await this.replyMap(actor, rows);
+    return rows.map((m) => this.messageView(actor, t, role, m, replies));
   }
 
   private stateFor(t: ChatThread, m: ChatMessage): MessageState {
@@ -147,8 +148,19 @@ export class MessagingService {
     return m.seq <= readSeq ? 'READ' : m.seq <= delivSeq ? 'DELIVERED' : 'SENT';
   }
 
-  private messageView(actor: Actor, t: ChatThread, role: Side | 'GUARDIAN', m: MessageFull) {
+  /** Javob berilgan xabarlarning qisqa nusxasi (iqtibos uchun). */
+  private async replyMap(actor: Actor, rows: { replyToId?: string | null }[]) {
+    const ids = [...new Set(rows.map((r) => r.replyToId).filter((x): x is string => !!x))];
+    const out = new Map<string, { id: string; body: string; hasFile: boolean; deleted: boolean; mine: boolean; name: string | null }>();
+    if (!ids.length) return out;
+    const found = await this.prisma.chatMessage.findMany({ where: { id: { in: ids } }, select: { id: true, body: true, fileId: true, deletedAt: true, senderId: true, sender: { select: { name: true } } } });
+    for (const f of found) out.set(f.id, { id: f.id, body: f.deletedAt ? '' : f.body.slice(0, 140), hasFile: !!f.fileId && !f.deletedAt, deleted: !!f.deletedAt, mine: f.senderId === actor.id, name: f.sender.name ? f.sender.name.split(' ')[0] : null });
+    return out;
+  }
+
+  private messageView(actor: Actor, t: ChatThread, role: Side | 'GUARDIAN', m: MessageFull, replies?: Map<string, { id: string; body: string; hasFile: boolean; deleted: boolean; mine: boolean; name: string | null }>) {
     return {
+      replyTo: m.replyToId ? replies?.get(m.replyToId) ?? null : null,
       id: m.id,
       threadId: m.threadId,
       seq: m.seq,
@@ -161,7 +173,7 @@ export class MessagingService {
     };
   }
 
-  async send(actor: Actor, threadId: string, input: { body?: string; fileId?: string }) {
+  async send(actor: Actor, threadId: string, input: { body?: string; fileId?: string; replyToId?: string }) {
     const { t, role } = await this.mustSee(actor, threadId);
     if (role === 'GUARDIAN') throw new ForbiddenException('Guardians have read-only access');
     // Xabar so'rovi: tanish bo'lmagan odamga javob berilguncha faqat bitta xabar; javob yozish so'rovni qabul qilish hisoblanadi.
@@ -197,13 +209,17 @@ export class MessagingService {
       if (await this.prisma.chatMessage.findUnique({ where: { fileId: file.id } })) throw new ConflictException('File already sent');
     }
 
+    if (input.replyToId) {
+      const target = await this.prisma.chatMessage.findFirst({ where: { id: input.replyToId, threadId, deletedAt: null }, select: { id: true } });
+      if (!target) throw new NotFoundException('The message you reply to was not found');
+    }
     const msg = await this.prisma.$transaction(async (tx) => {
       // lastSeq ni atomik oshirish: bir vaqtdagi xabarlar turli seq oladi
       const updated = await tx.chatThread.update({
         where: { id: threadId },
         data: { lastSeq: { increment: 1 }, lastMessageAt: this.clock.now() },
       });
-      const m = await tx.chatMessage.create({ data: { threadId, seq: updated.lastSeq, senderId: actor.id, body, fileId: file?.id }, include: { file: true } });
+      const m = await tx.chatMessage.create({ data: { threadId, seq: updated.lastSeq, senderId: actor.id, body, fileId: file?.id, replyToId: input.replyToId ?? null }, include: { file: true } });
       // Yuboruvchi o'z xabarigacha hammasini o'qigan deb hisoblanadi
       await tx.chatThread.update({
         where: { id: threadId },
@@ -215,9 +231,9 @@ export class MessagingService {
 
     // Real vaqtda yetkazish: ikkala ishtirokchi (yuboruvchining boshqa qurilmalari ham) + o'quvchining vasiylari (faqat o'qish)
     const watchers = [t.teacherUserId, t.studentUserId, ...(await this.guardians.guardianIdsOf(t.studentUserId))];
-    for (const u of new Set(watchers)) this.realtime.emitToUser(u, 'message', { ...this.messageViewFor(u, fresh, msg) });
+    for (const u of new Set(watchers)) this.realtime.emitToUser(u, 'message', { ...this.messageViewFor(u, fresh, msg), replyTo: (await this.replyMap({ id: u } as Actor, [msg])).get(msg.replyToId ?? '') ?? null });
     await this.notifications.enqueue(other, 'message.new', { threadId }, { dedupeKey: `msg:${threadId}:${Math.floor(this.clock.now().getTime() / 300_000)}` });
-    return this.messageView(actor, fresh, role, msg);
+    return this.messageView(actor, fresh, role, msg, await this.replyMap(actor, [msg]));
   }
 
   /** Real vaqt payload'i: oluvchi uchun tayyorlangan ko'rinish (mine/state oluvchiga nisbatan) */
