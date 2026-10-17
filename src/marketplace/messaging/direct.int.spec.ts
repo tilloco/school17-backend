@@ -69,6 +69,27 @@ describe('direct messages, avatars, class reviews and comment reports (integrati
     assert.equal((await api(t, b.token).patch('/me', { username: a.username.toUpperCase() })).status, 409);
   });
 
+  it('friends from contacts: hashes of phone numbers find people (teens included); opt-out, blocked and unknown stay hidden', async () => {
+    const { createHash } = require('node:crypto');
+    const h = (n: string) => createHash('sha256').update(n).digest('hex');
+    const me = await makeUser(t, Role.STUDENT);
+    const a = await named(Role.STUDENT, 'dilnoza');
+    const kid = await makeUser(t, Role.STUDENT, { dateOfBirth: '2012-05-05' });
+    const hidden = await makeUser(t, Role.STUDENT);
+    const num = (i: number) => `+99890${String(Date.now() % 10000000).padStart(7, '0').slice(0, 6)}${i}`;
+    const [pa, pk, ph] = [num(1), num(2), num(3)];
+    await t.prisma.user.update({ where: { id: a.id }, data: { phone: pa, phoneHash: h(pa) } });
+    await t.prisma.user.update({ where: { id: kid.id }, data: { phone: pk, phoneHash: h(pk) } });
+    await t.prisma.user.update({ where: { id: hidden.id }, data: { phone: ph, phoneHash: h(ph), phoneDiscoverable: false } });
+    const res = await api(t, me.token).post('/threads/people-from-contacts', { hashes: [h(pa), h(pk), h(ph), h('+998000000000')] });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(res.body.map((x: any) => x.userId).sort(), [a.id, kid.id].sort());
+    assert.equal((await api(t, me.token).post('/threads/people-from-contacts', { hashes: ['+998901234567'] })).status, 400, 'raw numbers are refused: only hashes');
+    await t.prisma.userBlock.create({ data: { blockerId: me.id, blockedId: a.id } });
+    const after = await api(t, me.token).post('/threads/people-from-contacts', { hashes: [h(pa)] });
+    assert.equal(after.body.length, 0);
+  });
+
   it('message request: one message until accepted; replying accepts; declining stops it', async () => {
     const a = await named(Role.STUDENT, 'sender');
     const c = await named(Role.TEACHER, 'ustoz');

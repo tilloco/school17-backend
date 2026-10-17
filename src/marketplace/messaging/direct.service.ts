@@ -109,4 +109,18 @@ export class DirectService {
     }
     return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
+
+  /** Kontaktlardagi odamlar: raqamlari xeshi mos, topilishga rozi va bloklanmagan akkauntlar. Natijada faqat ism/@nom/rol/rasm. */
+  async fromContacts(actor: Actor, hashes: string[]) {
+    const uniq = [...new Set(hashes.map((h) => h.toLowerCase()))];
+    if (!uniq.length) return [];
+    const rows = await this.prisma.user.findMany({
+      where: { phoneHash: { in: uniq }, phoneDiscoverable: true, status: 'ACTIVE', role: { not: Role.ADMIN }, id: { not: actor.id } },
+      take: 200,
+      select: { id: true, name: true, username: true, role: true, dateOfBirth: true, avatarFileId: true },
+    });
+    const blocks = await this.prisma.userBlock.findMany({ where: { OR: [{ blockerId: actor.id }, { blockedId: actor.id }] }, select: { blockerId: true, blockedId: true } });
+    const hidden = new Set(blocks.flatMap((b) => [b.blockerId, b.blockedId]));
+    return rows.filter((r) => !hidden.has(r.id)).map((r) => ({ userId: r.id, name: displayName(r.name, this.isMinor(r.dateOfBirth)), username: r.username, role: r.role, hasPhoto: !!r.avatarFileId }));
+  }
 }

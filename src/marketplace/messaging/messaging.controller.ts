@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsInt, Matches, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 import { Actor } from '../common/actor';
 import { CurrentActor, RequirePermission, UserActorGuard } from '../common/actor.guard';
 import { ReportReason } from '@prisma/client';
@@ -28,6 +28,10 @@ class SeqDto {
   @IsInt() @Min(0) @Max(2_000_000_000) upToSeq!: number;
 }
 
+class ContactHashesDto {
+  @IsArray() @ArrayMaxSize(3000) @IsString({ each: true }) @Matches(/^[0-9a-f]{64}$/, { each: true }) hashes!: string[];
+}
+
 @Controller('threads')
 @UseGuards(UserActorGuard)
 export class MessagingController {
@@ -51,6 +55,11 @@ export class MessagingController {
 
   @Get('people') @RequirePermission('message.send')
   people(@CurrentActor() a: Actor, @Query('q') q?: string) { return this.direct.search(a, q ?? ''); }
+
+  /** Telefon kontaktlaridagi tanishlar: mijoz raqamlarning SHA-256 xeshlarini yuboradi; server hech narsani saqlamaydi. */
+  @Throttle({ default: { limit: 6, ttl: 3_600_000 } })
+  @Post('people-from-contacts') @HttpCode(200) @RequirePermission('message.send')
+  fromContacts(@CurrentActor() a: Actor, @Body() dto: ContactHashesDto) { return this.direct.fromContacts(a, dto.hashes); }
 
   @Get('contacts') @RequirePermission('message.send')
   contacts(@CurrentActor() a: Actor) { return this.direct.contacts(a); }

@@ -173,7 +173,7 @@ export class AuthService {
       // User.email majburiy va noyob: telefon bilan kirganlarga ichki, hech qachon yetkazilmaydigan manzil beriladi
       user = await this.prisma.user.create({
         data: {
-          email: `tg${phone.slice(1)}@phone.school17.invalid`, phone, username, name: dto.name.trim(), role: dto.role, dateOfBirth: dob, locale: dto.locale ?? 'uz',
+          email: `tg${phone.slice(1)}@phone.school17.invalid`, phone, phoneHash: createHash('sha256').update(phone).digest('hex'), username, name: dto.name.trim(), role: dto.role, dateOfBirth: dob, locale: dto.locale ?? 'uz',
           referralCode: this.generateReferralCode() + randomBytes(2).toString('hex').toUpperCase(),
           consents: { create: kinds.map((kind) => ({ kind, version: CURRENT_VERSIONS[kind], locale: dto.locale ?? 'uz' })) },
         },

@@ -26,6 +26,7 @@ export interface UpdateMeInput {
   username?: string;
   bio?: string;
   dmRequests?: boolean;
+  phoneDiscoverable?: boolean;
 }
 
 @Injectable()
@@ -41,6 +42,8 @@ export class AccountService {
       username: u.username,
       bio: u.bio,
       dmRequests: u.dmRequests,
+      phoneDiscoverable: u.phoneDiscoverable,
+      hasPhone: !!u.phoneHash,
       hasPhoto: !!u.avatarFileId,
       role: u.role,
       locale: u.locale,
@@ -75,6 +78,7 @@ export class AccountService {
       data.bio = bio || null;
     }
     if (input.dmRequests !== undefined) data.dmRequests = input.dmRequests;
+    if (input.phoneDiscoverable !== undefined) data.phoneDiscoverable = input.phoneDiscoverable;
     if (input.locale !== undefined) {
       if (!(LOCALES as readonly string[]).includes(input.locale)) throw new BadRequestException('Unsupported locale');
       data.locale = input.locale;

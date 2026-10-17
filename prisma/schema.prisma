@@ -100,6 +100,8 @@ model User {
   bio                     String? // qisqa "men haqimda" (200 belgigacha), telefon/havola yo'q; 18 yoshgacha bo'lganlarda boshqalarga ko'rsatilmaydi
   avatarFileId            String? // profil rasmi (StoredFile AVATAR); o'qituvchida TeacherProfile.photoFileId bilan bir xil
   username                String?            @unique // @nom: kichik harf, raqam, pastki chiziq; qidiruvda ishlatiladi
+  phoneHash               String?            @unique // sha256(E.164) — telefon kontaktlari bilan solishtirish uchun; raqamning o'zi emas
+  phoneDiscoverable       Boolean            @default(true) // raqami kontaktida borlar uni topa oladimi
   phone                   String?            @unique // E.164, Telegram kod orqali tasdiqlangan; boshqalarga ko'rsatilmaydi
   dailyStudyMinutes       Int?
   selfLevel               String?

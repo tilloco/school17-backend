@@ -17,6 +17,7 @@ class UpdateMeDto {
   @IsOptional() @IsString() @MaxLength(24) username?: string;
   @IsOptional() @IsString() @MaxLength(300) bio?: string;
   @IsOptional() @IsBoolean() dmRequests?: boolean;
+  @IsOptional() @IsBoolean() phoneDiscoverable?: boolean;
   @IsOptional() @IsString() @MaxLength(5) locale?: string;
   @IsOptional() @IsString() @MaxLength(64) timezone?: string;
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) dateOfBirth?: string;
