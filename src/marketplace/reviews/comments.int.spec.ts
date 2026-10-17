@@ -46,26 +46,33 @@ describe('usernames, people search and public comments (integration)', () => {
     assert.equal((await api(t, exPupil.token).post('/classes/join', { code: c.joinCode })).status, 200);
     const base = `/teachers/${x.profileId}/comments`;
 
-    assert.equal((await api(t, stranger.token).post(base, { text: 'ok' })).status, 400, 'too short');
-    assert.equal((await api(t, stranger.token).post(base, { text: 'Call me +998 90 123 45 67' })).status, 400);
-    assert.equal((await api(t, x.user.token).post(base, { text: 'I am great' })).status, 403, 'not on your own profile');
+    assert.equal((await api(t, stranger.token).post(base, { text: 'ok', rating: 5 })).status, 400, 'too short');
+    assert.equal((await api(t, stranger.token).post(base, { text: 'Call me +998 90 123 45 67', rating: 5 })).status, 400);
+    assert.equal((await api(t, x.user.token).post(base, { text: 'I am great', rating: 5 })).status, 403, 'not on your own profile');
     const other = await makeTeacher(t, { approve: { adminToken: admin.token } });
-    assert.equal((await api(t, other.user.token).post(base, { text: 'Rival comment here' })).status, 403, 'not from other teachers');
+    assert.equal((await api(t, other.user.token).post(base, { text: 'Rival comment here', rating: 5 })).status, 403, 'not from other teachers');
 
-    assert.equal((await api(t, stranger.token).post(base, { text: 'Clear explanations, thank you' })).status, 201);
-    assert.equal((await api(t, exPupil.token).post(base, { text: 'My grades went up' })).status, 201);
+    assert.equal((await api(t, stranger.token).post(base, { text: 'Clear explanations, thank you', rating: 5 })).status, 201);
+    assert.equal((await api(t, exPupil.token).post(base, { text: 'My grades went up', rating: 5 })).status, 201);
     const list = (await api(t, stranger.token).get(base)).body;
     assert.equal(list.items.length, 2);
+    assert.equal(list.items[0].exStudent, true, 'former pupils come first');
+    assert.deepEqual(list.summary, { count: 2, average: 5 });
+    assert.equal((await api(t, stranger.token).post(base, { text: 'No stars given here' })).status, 400, 'a star rating is required');
+    assert.equal((await api(t, stranger.token).post(base, { text: 'Six stars given', rating: 6 })).status, 400);
+    assert.equal((await api(t, x.user.token).del(`${base}/mine`)).status, 200, 'the teacher has no comment of their own');
+    assert.equal((await api(t, stranger.token).get(base)).body.items.length, 2, 'a teacher can never delete what pupils wrote');
     const by = (n: string) => list.items.find((i: any) => i.text.startsWith(n));
     assert.equal(by('Clear').exStudent, false);
     assert.equal(by('My grades').exStudent, true);
     assert.equal(by('Clear').mine, true);
     assert.equal(by('Clear').author, 'Sardor N.', 'only first name and initial');
 
-    assert.equal((await api(t, stranger.token).post(base, { text: 'Edited: even better now' })).status, 201);
+    assert.equal((await api(t, stranger.token).post(base, { text: 'Edited: even better now', rating: 5 })).status, 201);
     const again = (await api(t, stranger.token).get(base)).body;
     assert.equal(again.items.length, 2, 'one comment per person');
     assert.equal(again.mine.text, 'Edited: even better now');
+    assert.equal(again.mine.rating, 5);
     assert.equal((await api(t, stranger.token).del(`${base}/mine`)).status, 200);
     assert.equal((await api(t, stranger.token).get(base)).body.items.length, 1);
   });

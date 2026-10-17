@@ -221,7 +221,7 @@ describe('direct messages, avatars, class reviews and comment reports (integrati
     const writer = await makeUser(t, Role.STUDENT, { name: 'Rude Person' });
     const reader = await makeUser(t, Role.STUDENT);
     const base = `/teachers/${x.profileId}/comments`;
-    assert.equal((await api(t, writer.token).post(base, { text: 'Terrible teacher, total waste' })).status, 201);
+    assert.equal((await api(t, writer.token).post(base, { text: 'Terrible teacher, total waste', rating: 4 })).status, 201);
     const cid = (await api(t, reader.token).get(base)).body.items[0].id;
     assert.equal((await api(t, writer.token).post(`${base}/${cid}/report`, { reason: 'ABUSE' })).status, 403, 'not your own');
     const rep = await api(t, reader.token).post(`${base}/${cid}/report`, { reason: 'ABUSE' });

@@ -16,6 +16,9 @@ class ProfileDto {
   @IsOptional() @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) @MaxLength(40, { each: true }) levels?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(5) @IsString({ each: true }) @MaxLength(5, { each: true }) languages?: string[];
   @IsOptional() @IsInt() priceMinor?: number;
+  @ValidateIf((_o, v) => v !== undefined && v !== null) @IsOptional() @IsInt() experienceYears?: number | null;
+  @IsOptional() @IsString() @MaxLength(600) education?: string;
+  @IsOptional() @IsString() @MaxLength(60) city?: string;
   @ValidateIf((_o, v) => v !== undefined) @IsOptional() @IsString() @MaxLength(300) introVideoUrl?: string | null;
   @IsOptional() @IsBoolean() instantBooking?: boolean;
   @IsOptional() @IsIn(['PAY_BEFORE', 'PAY_AFTER']) paymentTiming?: 'PAY_BEFORE' | 'PAY_AFTER';
@@ -98,6 +101,19 @@ export class TeachersPublicController {
 
   @Get(':id') @RequirePermission('booking.participate')
   get(@Param('id', ParseUUIDPipe) id: string) { return this.teachers.publicProfile(id); }
+
+  /** Approved credential (diploma/certificate) thumbnail: only an APPROVED credential of a VERIFIED teacher is public. */
+  @Get(':id/credentials/:cid/image') @RequirePermission('booking.participate')
+  async credentialImage(@Param('id', ParseUUIDPipe) id: string, @Param('cid', ParseUUIDPipe) cid: string, @Res() res: any) {
+    const f = await this.teachers.credentialFile(id, cid);
+    const data = await this.files.readThumb(f);
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Content-Disposition', 'attachment; filename="certificate.webp"');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.status(200).end(data);
+  }
 
   /** Profil surati (eskiz). Mobil Image komponenti Authorization sarlavhasi bilan oladi. Brauzerda inline ko'rsatilmaydi (attachment + sandbox). */
   @Get(':id/photo') @RequirePermission('booking.participate')

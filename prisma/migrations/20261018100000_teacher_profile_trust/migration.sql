@@ -1,0 +1,2 @@
+ALTER TABLE "TeacherProfile" ADD COLUMN "experienceYears" INTEGER, ADD COLUMN "education" TEXT NOT NULL DEFAULT '', ADD COLUMN "city" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "TeacherComment" ADD COLUMN "rating" INTEGER;

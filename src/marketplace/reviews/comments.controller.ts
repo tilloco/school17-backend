@@ -1,13 +1,13 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { ReportReason, ReportTargetType } from '@prisma/client';
 import { ReportsService } from '../moderation/reports.service';
 import { Actor } from '../common/actor';
 import { CurrentActor, RequirePermission, UserActorGuard } from '../common/actor.guard';
 import { CommentsService } from './comments.service';
 
-class CommentDto { @IsString() @MaxLength(600) text!: string; }
+class CommentDto { @IsString() @MaxLength(600) text!: string; @IsInt() @Min(1) @Max(5) rating!: number; }
 class ReportDto { @IsEnum(ReportReason) reason!: ReportReason; @IsOptional() @IsString() @MaxLength(1000) note?: string; }
 
 @Controller('teachers/:id/comments')
@@ -20,7 +20,7 @@ export class CommentsController {
 
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post() @HttpCode(201) @RequirePermission('booking.participate')
-  write(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CommentDto) { return this.comments.write(a, id, dto.text); }
+  write(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CommentDto) { return this.comments.write(a, id, dto.text, dto.rating); }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post(':cid/report') @HttpCode(201) @RequirePermission('report.create')

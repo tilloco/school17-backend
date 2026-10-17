@@ -591,6 +591,9 @@ model TeacherProfile {
   instantBooking     Boolean            @default(false)
   paymentTiming      PaymentTiming      @default(PAY_AFTER)
   photoFileId        String? // StoredFile (AVATAR) — profil surati
+  experienceYears    Int? // necha yillik tajriba
+  education          String             @default("") @db.Text // ta'lim / oliygoh
+  city               String             @default("")
   verificationStatus VerificationStatus @default(DRAFT)
   verifiedAt         DateTime?
   verifiedByAdminId  String?
@@ -1587,6 +1590,7 @@ model TeacherComment {
   teacherId String
   authorId  String
   text      String    @db.Text
+  rating    Int? // 1..5 yulduz; eski izohlarda bo'sh
   hidden    Boolean   @default(false)
   createdAt DateTime  @default(now())
   editedAt  DateTime?

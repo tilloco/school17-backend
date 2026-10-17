@@ -24,6 +24,7 @@ export interface CompletenessInput {
   priceMinor: number;
   availabilityRules: number;
   credentialCount: number;
+  hasPhoto: boolean;
 }
 
 /** Tekshiruvga yuborishdan oldin profil to'liqligi. Bo'sh ro'yxat => to'liq. */
@@ -37,6 +38,7 @@ export function missingForSubmission(p: CompletenessInput): string[] {
   if (p.priceMinor <= 0) missing.push('price');
   if (p.availabilityRules === 0) missing.push('availability');
   if (p.credentialCount === 0) missing.push('credentials');
+  if (!p.hasPhoto) missing.push('photo'); // face photo is mandatory: trust
   return missing;
 }
 

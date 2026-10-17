@@ -93,7 +93,9 @@ describe('teacher profiles (integration)', () => {
     assert.equal(pub.body.verified, true);
     assert.ok(!JSON.stringify(pub.body).includes(user.email), 'email must not leak');
     assert.ok(!('userId' in pub.body));
-    assert.deepEqual(pub.body.credentials, [{ kind: 'DEGREE', title: 'BSc Mathematics' }]);
+    assert.deepEqual(pub.body.credentials.map((c: any) => [c.kind, c.title]), [['DEGREE', 'BSc Mathematics']]);
+    assert.ok(pub.body.verifiedAt, 'verified date is public');
+    assert.deepEqual(pub.body.stats, { students: 0, lessons: 0 });
 
     const rows = await t.prisma.auditLog.findMany({ where: { targetId: profileId, action: 'teacher.approve' } });
     assert.equal(rows.length, 1);
@@ -159,5 +161,35 @@ describe('teacher profiles (integration)', () => {
     assert.equal((await api(t, admin.token).get('/admin/market/teachers/' + profileId)).status, 200, 'admin');
     assert.equal((await api(t, admin.token).get('/teachers/' + profileId)).status, 401, 'admin tokens are for admin routes only');
     assert.equal((await api(t).get('/teachers/' + profileId)).status, 401, 'anonymous');
+  });
+
+  it('trust: a face photo is mandatory; experience/education/city are public; approved credential images are public, others are not', async () => {
+    const u = await makeUser(t, Role.TEACHER);
+    const c = api(t, u.token);
+    const prof = await c.put('/teachers/me/profile', { ...GOOD_PROFILE, experienceYears: 7, education: 'TDPU, Mathematics', city: 'Tashkent' });
+    assert.equal(prof.status, 200);
+    assert.equal(prof.body.experienceYears, 7);
+    assert.equal((await c.put('/teachers/me/profile', { experienceYears: 90 })).status, 400);
+    await c.put('/teachers/me/availability', { rules: [{ weekday: 1, start: '09:00', end: '12:00' }] });
+    const file = await makeFile(t, u.id);
+    await c.post('/teachers/me/credentials', { kind: 'DEGREE', title: 'Diploma', fileId: file.id });
+    const nope = await c.post('/teachers/me/submit');
+    assert.equal(nope.status, 400);
+    assert.deepEqual(nope.body.missing, ['photo']);
+
+    const face = await makeFile(t, u.id, { purpose: 'AVATAR' });
+    await t.prisma.teacherProfile.update({ where: { id: prof.body.id }, data: { photoFileId: face.id } });
+    assert.equal((await c.post('/teachers/me/submit')).status, 200);
+    assert.equal((await api(t, admin.token).post('/admin/market/teachers/' + prof.body.id + '/approve')).status, 200);
+    const student = await makeUser(t, Role.STUDENT);
+    const pub = (await api(t, student.token).get('/teachers/' + prof.body.id)).body;
+    assert.equal(pub.city, 'Tashkent');
+    assert.equal(pub.education, 'TDPU, Mathematics');
+    assert.equal(pub.experienceYears, 7);
+    // no thumbnail was generated for this synthetic file: nothing leaks, only 404
+    const credId = pub.credentials[0].id;
+    assert.equal((await api(t, student.token).get(`/teachers/${prof.body.id}/credentials/${credId}/image`)).status, 404);
+    await t.prisma.teacherCredential.update({ where: { id: credId }, data: { status: 'REJECTED' } });
+    assert.equal((await api(t, student.token).get(`/teachers/${prof.body.id}/credentials/${credId}/image`)).status, 404, 'rejected credentials are never public');
   });
 });

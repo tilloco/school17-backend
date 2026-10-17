@@ -19,6 +19,9 @@ export interface ProfileInput {
   introVideoUrl?: string | null;
   instantBooking?: boolean;
   paymentTiming?: 'PAY_BEFORE' | 'PAY_AFTER';
+  experienceYears?: number | null;
+  education?: string;
+  city?: string;
 }
 
 const uniq = (a: string[]) => Array.from(new Set(a));
@@ -70,6 +73,12 @@ export class TeachersService {
       if (input.introVideoUrl !== null && !isAllowedIntroVideoUrl(input.introVideoUrl)) throw new BadRequestException('Intro video URL not allowed');
       data.introVideoUrl = input.introVideoUrl;
     }
+    if (input.experienceYears !== undefined) {
+      if (input.experienceYears !== null && (input.experienceYears < 0 || input.experienceYears > 70)) throw new BadRequestException('Experience out of range');
+      data.experienceYears = input.experienceYears;
+    }
+    if (input.education !== undefined) data.education = input.education.trim();
+    if (input.city !== undefined) data.city = input.city.trim();
     if (input.instantBooking !== undefined) data.instantBooking = input.instantBooking;
     if (input.paymentTiming !== undefined) data.paymentTiming = input.paymentTiming;
 
@@ -144,6 +153,16 @@ export class TeachersService {
     return f;
   }
 
+  /** Public: an approved credential of a verified teacher. Anything else is 404. */
+  async credentialFile(profileId: string, credentialId: string) {
+    const c = await this.prisma.teacherCredential.findFirst({
+      where: { id: credentialId, teacherId: profileId, status: 'APPROVED', teacher: { verificationStatus: VerificationStatus.VERIFIED, user: { status: 'ACTIVE' } } },
+      include: { file: true },
+    });
+    if (!c || c.file.deletedAt || c.file.status !== 'READY' || !c.file.thumbKey) throw new NotFoundException('Not found');
+    return c.file;
+  }
+
   async addTimeOff(actor: Actor, startAt: Date, endAt: Date, reason?: string) {
     const p = await this.ownProfileOrThrow(actor);
     if (!(startAt < endAt)) throw new BadRequestException('Invalid range');
@@ -193,7 +212,7 @@ export class TeachersService {
       this.prisma.availabilityRule.count({ where: { teacherId: p.id } }),
       this.prisma.teacherCredential.count({ where: { teacherId: p.id } }),
     ]);
-    const missing = missingForSubmission({ ...p, availabilityRules: rules, credentialCount: creds });
+    const missing = missingForSubmission({ ...p, availabilityRules: rules, credentialCount: creds, hasPhoto: !!p.photoFileId });
     if (missing.length) throw new BadRequestException({ message: 'Profile incomplete', missing });
     const next = nextStatus(p.verificationStatus, 'submit');
     if (!next) throw new ConflictException(`Cannot submit from ${p.verificationStatus}`);
@@ -232,8 +251,24 @@ export class TeachersService {
       paymentInfoAvailable: (await this.prisma.teacherPaymentInfo.count({ where: { teacherId: p.id } })) > 0,
       verified: true,
       rating: { count: p.ratingCount, average: p.ratingCount ? p.ratingSum / p.ratingCount : null, bayesian: p.ratingBayes },
-      credentials: p.credentials.map((c) => ({ kind: c.kind, title: c.title })),
+      credentials: p.credentials.map((c) => ({ id: c.id, kind: c.kind, title: c.title })),
+      verifiedAt: p.verifiedAt,
+      experienceYears: p.experienceYears,
+      education: p.education,
+      city: p.city,
+      stats: await this.stats(p.id),
     };
+  }
+
+  /** Public trust numbers: how many pupils they taught and how many lessons they gave (completed only). */
+  private async stats(profileId: string) {
+    const [b, e, lessons, sessions] = await Promise.all([
+      this.prisma.booking.findMany({ where: { teacherId: profileId, status: 'COMPLETED' }, select: { studentId: true }, distinct: ['studentId'] }),
+      this.prisma.classEnrollment.findMany({ where: { class: { teacherId: profileId } }, select: { pupilId: true }, distinct: ['pupilId'] }),
+      this.prisma.booking.count({ where: { teacherId: profileId, status: 'COMPLETED' } }),
+      this.prisma.classSession.count({ where: { class: { teacherId: profileId }, status: 'ENDED' } }),
+    ]);
+    return { students: new Set([...b.map((x) => x.studentId), ...e.map((x) => x.pupilId)]).size, lessons: lessons + sessions };
   }
 
   // ---------- admin ----------
@@ -333,6 +368,9 @@ export class TeachersService {
       priceMinor: p.priceMinor,
       currency: p.currency,
       introVideoUrl: p.introVideoUrl,
+      experienceYears: p.experienceYears,
+      education: p.education,
+      city: p.city,
       instantBooking: p.instantBooking,
       paymentTiming: p.paymentTiming,
       hasPhoto: !!p.photoFileId,

@@ -67,9 +67,10 @@ describe('verification state machine', () => {
     assert.equal(nextStatus('DRAFT', 'reinstate'), null);
   });
   it('completeness list', () => {
-    const full = { headline: 'Math tutor', bio: 'x'.repeat(60), subjects: ['math'], levels: ['adult'], languages: ['uz'], priceMinor: 5_000_000, availabilityRules: 1, credentialCount: 1 };
+    const full = { headline: 'Math tutor', bio: 'x'.repeat(60), subjects: ['math'], levels: ['adult'], languages: ['uz'], priceMinor: 5_000_000, availabilityRules: 1, credentialCount: 1, hasPhoto: true };
     assert.deepEqual(missingForSubmission(full), []);
     assert.deepEqual(missingForSubmission({ ...full, credentialCount: 0, bio: 'short' }).sort(), ['bio', 'credentials']);
+    assert.deepEqual(missingForSubmission({ ...full, hasPhoto: false }), ['photo']);
   });
   it('intro video allowlist: https youtube/vimeo only', () => {
     assert.equal(isAllowedIntroVideoUrl('https://www.youtube.com/watch?v=abc'), true);

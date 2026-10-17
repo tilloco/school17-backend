@@ -202,6 +202,9 @@ export async function makeTeacher(t: TestApp, opts: { submit?: boolean; approve?
   const prof = await c.put('/teachers/me/profile', GOOD_PROFILE);
   if (prof.status !== 200) throw new Error(`profile failed ${prof.status} ${JSON.stringify(prof.body)}`);
   await c.put('/teachers/me/availability', { rules: [1, 2, 3, 4, 5].map((d) => ({ weekday: d, start: '09:00', end: '18:00' })) });
+  const face = await makeFile(t, user.id, { purpose: 'AVATAR' });
+  await t.prisma.teacherProfile.update({ where: { id: prof.body.id }, data: { photoFileId: face.id } });
+  await t.prisma.storedFile.update({ where: { id: face.id }, data: { sizeBytes: 0 } }); // must not eat the storage quota the tests measure
   const file = await makeFile(t, user.id);
   await c.post('/teachers/me/credentials', { kind: 'DEGREE', title: 'BSc Mathematics', fileId: file.id });
   if (opts.submit || opts.approve) await c.post('/teachers/me/submit');

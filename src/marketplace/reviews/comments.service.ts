@@ -37,17 +37,19 @@ export class CommentsService {
     const users = await this.prisma.user.findMany({ where: { id: { in: rows.map((r) => r.authorId) } }, select: { id: true, name: true } });
     const names = new Map(users.map((u) => [u.id, u.name]));
     const ex = await this.exStudents(profileId, rows.map((r) => r.authorId));
-    const mine = await this.prisma.teacherComment.findUnique({ where: { teacherId_authorId: { teacherId: profileId, authorId: actor.id } }, select: { id: true, text: true } });
-    return {
-      items: rows.map((r) => ({ id: r.id, text: r.text, at: r.createdAt, author: displayName(names.get(r.authorId) ?? null, true), exStudent: ex.has(r.authorId), mine: r.authorId === actor.id })),
-      mine: mine ? { id: mine.id, text: mine.text } : null,
-    };
+    const mine = await this.prisma.teacherComment.findUnique({ where: { teacherId_authorId: { teacherId: profileId, authorId: actor.id } }, select: { id: true, text: true, rating: true } });
+    const agg = await this.prisma.teacherComment.aggregate({ where: { teacherId: profileId, hidden: false, rating: { not: null } }, _count: { _all: true }, _avg: { rating: true } });
+    // former pupils first, newest first inside each group
+    const items = rows.map((r) => ({ id: r.id, text: r.text, rating: r.rating, at: r.createdAt, author: displayName(names.get(r.authorId) ?? null, true), exStudent: ex.has(r.authorId), mine: r.authorId === actor.id }));
+    items.sort((a, b) => Number(b.exStudent) - Number(a.exStudent));
+    return { items, mine: mine ? { id: mine.id, text: mine.text, rating: mine.rating } : null, summary: { count: agg._count._all, average: agg._avg.rating === null ? null : Math.round(agg._avg.rating * 100) / 100 } };
   }
 
-  async write(actor: Actor, profileId: string, textIn: string) {
+  async write(actor: Actor, profileId: string, textIn: string, rating: number) {
     const p = await this.publicProfile(profileId);
     if (p.userId === actor.id) throw new ForbiddenException('You cannot comment on your own profile');
     if (actor.role === 'TEACHER') throw new ForbiddenException('Teachers cannot comment on other teachers');
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new BadRequestException('Rating must be 1..5');
     const text = textIn.trim();
     if (text.length < 3) throw new BadRequestException('Write a few words');
     if (text.length > COMMENT_MAX_CHARS) throw new BadRequestException('Comment too long');
@@ -55,8 +57,8 @@ export class CommentsService {
     const now = this.clock.now();
     const row = await this.prisma.teacherComment.upsert({
       where: { teacherId_authorId: { teacherId: profileId, authorId: actor.id } },
-      create: { teacherId: profileId, authorId: actor.id, text, createdAt: now },
-      update: { text, editedAt: now, hidden: false },
+      create: { teacherId: profileId, authorId: actor.id, text, rating, createdAt: now },
+      update: { text, rating, editedAt: now, hidden: false },
     });
     return { id: row.id };
   }
