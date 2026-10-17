@@ -22,10 +22,10 @@ export class ClassRoomController {
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('start') @HttpCode(200) @RequirePermission('class.manage')
-  start(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.start(a, sid); }
+  start(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.start(a, sid).then((r) => this.room.notify(sid, r)); }
 
   @Post('end') @HttpCode(200) @RequirePermission('class.manage')
-  end(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.end(a, sid); }
+  end(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.end(a, sid).then((r) => this.room.notify(sid, r)); }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post('token') @HttpCode(200) @RequirePermission('class.read')
@@ -33,39 +33,42 @@ export class ClassRoomController {
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('hand') @HttpCode(200) @RequirePermission('class.join')
-  hand(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: HandDto) { return this.room.hand(a, sid, dto.raised); }
+  hand(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: HandDto) { return this.room.hand(a, sid, dto.raised).then((r) => this.room.notify(sid, r)); }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('stage/take') @HttpCode(200) @RequirePermission('class.join')
-  take(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.takeStage(a, sid); }
+  take(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.takeStage(a, sid).then((r) => this.room.notify(sid, r)); }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('stage/leave') @HttpCode(200) @RequirePermission('class.join')
   leave(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.stepDown(a, sid); }
 
   @Post('stage/grant') @HttpCode(200) @RequirePermission('class.manage')
-  grant(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: GrantDto) { return this.room.grant(a, sid, dto.pupilId, dto.mode); }
+  grant(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: GrantDto) { return this.room.grant(a, sid, dto.pupilId, dto.mode).then((r) => this.room.notify(sid, r)); }
 
   @Post('stage/revoke') @HttpCode(200) @RequirePermission('class.manage')
-  revoke(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: PupilDto) { return this.room.revoke(a, sid, dto.pupilId); }
+  revoke(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: PupilDto) { return this.room.revoke(a, sid, dto.pupilId).then((r) => this.room.notify(sid, r)); }
 
   @Post('stage/mode') @HttpCode(200) @RequirePermission('class.manage')
   mode(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: StageModeDto) { return this.room.setStageMode(a, sid, dto.mode); }
 
   @Post('mute-all') @HttpCode(200) @RequirePermission('class.manage')
-  muteAll(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.muteAll(a, sid); }
+  muteAll(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.muteAll(a, sid).then((r) => this.room.notify(sid, r)); }
 
   @Post('mute') @HttpCode(200) @RequirePermission('class.manage')
-  mute(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: PupilDto) { return this.room.mute(a, sid, dto.pupilId); }
+  mute(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: PupilDto) { return this.room.mute(a, sid, dto.pupilId).then((r) => this.room.notify(sid, r)); }
 
   @Post('spotlight') @HttpCode(200) @RequirePermission('class.manage')
-  spotlight(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: SpotlightDto) { return this.room.spotlight(a, sid, dto.pupilId ?? null); }
+  spotlight(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: SpotlightDto) { return this.room.spotlight(a, sid, dto.pupilId ?? null).then((r) => this.room.notify(sid, r)); }
 
   @Post('remove') @HttpCode(200) @RequirePermission('class.manage')
-  remove(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: PupilDto) { return this.room.removePupil(a, sid, dto.pupilId); }
+  remove(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: PupilDto) { return this.room.removePupil(a, sid, dto.pupilId).then((r) => this.room.notify(sid, r)); }
 
   @Post('lock') @HttpCode(200) @RequirePermission('class.manage')
-  lock(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: LockDto) { return this.room.lock(a, sid, dto.locked); }
+  lock(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string, @Body() dto: LockDto) { return this.room.lock(a, sid, dto.locked).then((r) => this.room.notify(sid, r)); }
+
+  @Get('audience') @RequirePermission('class.read')
+  audience(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.audience(a, sid); }
 
   @Get('roster') @RequirePermission('class.manage')
   roster(@CurrentActor() a: Actor, @Param('sid', ParseUUIDPipe) sid: string) { return this.room.roster(a, sid); }

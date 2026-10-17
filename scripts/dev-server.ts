@@ -25,7 +25,7 @@ process.env.ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'dev-only-admin-s
 process.env.APP_DATA_KEY = process.env.APP_DATA_KEY || '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
 process.env.FILES_DIR = process.env.FILES_DIR || join(process.cwd(), 'files');
 process.env.TRUST_PROXY = process.env.TRUST_PROXY ?? '1';
-process.env.CALL_PROVIDER = 'mock';
+process.env.CALL_PROVIDER = process.env.CALL_PROVIDER || 'mock'; // the launcher sets 'livekit' when a local LiveKit server is installed
 // Real Telegram codes for local testing: put the Gateway token alone in backend/.devdb/telegram.token (gitignored). Without it, codes are shown on screen.
 try {
   const tok = require('fs').readFileSync(join(process.cwd(), '..', 'telegram.token'), 'utf8').trim();

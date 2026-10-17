@@ -1,7 +1,8 @@
 import { BadGatewayException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ClassSession, Role, StageState } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Actor } from '../common/actor';
+import { Actor, ADULT_AGE, ageInYears } from '../common/actor';
+import { RealtimeService } from '../messaging/realtime.service';
 import { AuditService } from '../common/audit.service';
 import { ClockService } from '../common/clock';
 import { marketConfig } from '../common/config';
@@ -27,6 +28,7 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
     private payments: ClassPaymentsService,
     private feedSvc: ClassFeedService,
     @Inject(CALL_PROVIDER) private provider: CallProvider,
+    private realtime: RealtimeService,
   ) {}
 
   onModuleInit() {
@@ -160,8 +162,9 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
     const cfg = marketConfig();
     const stageCount = await this.prisma.classParticipant.count({ where: { sessionId, stage: { not: 'NONE' }, removedAt: null } });
     const me = teacher ? null : await this.prisma.classParticipant.findUnique({ where: { sessionId_pupilId: { sessionId, pupilId: actor.id } } });
+    const cls = await this.prisma.class.findUnique({ where: { id: s.classId }, select: { protectContent: true, teacher: { select: { userId: true, user: { select: { name: true } } } } } });
     return {
-      id: s.id, classId: s.classId, protectContent: !!(await this.prisma.class.findUnique({ where: { id: s.classId }, select: { protectContent: true } }))?.protectContent, role: teacher ? 'teacher' : 'pupil', status: s.status, startAt: s.startAt, endAt: s.endAt,
+      id: s.id, classId: s.classId, protectContent: !!cls?.protectContent, teacherId: cls?.teacher.userId ?? null, teacherName: cls?.teacher.user.name ?? null, role: teacher ? 'teacher' : 'pupil', status: s.status, startAt: s.startAt, endAt: s.endAt,
       lobbyOpensAt: new Date(s.startAt.getTime() - cfg.classLobbyMinutes * 60_000),
       stageMode: s.stageMode, chatMode: s.chatMode, questionsMode: s.questionsMode, slowModeSeconds: s.slowModeSeconds, handRaiseOn: s.handRaiseOn, locked: s.locked, spotlightPupilId: s.spotlightPupilId,
       teacherReconnecting: s.status === 'LIVE' && !!s.teacherAbsentSince, teacherNoShow: s.teacherNoShow, endReason: s.endReason,
@@ -323,6 +326,37 @@ export class ClassRoomService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ---------- ro'yxat va davomat ----------
+  /** Tells everybody in the class that the room changed (hand, stage, lock...), so screens refresh at once instead of polling. */
+  async notify<T>(sessionId: string, result: T): Promise<T> {
+    const s = await this.prisma.classSession.findUnique({ where: { id: sessionId }, select: { classId: true, class: { select: { teacher: { select: { userId: true } } } } } });
+    if (s) {
+      const rows = await this.prisma.classEnrollment.findMany({ where: { classId: s.classId, status: 'ACTIVE' }, select: { pupilId: true } });
+      for (const u of [s.class.teacher.userId, ...rows.map((r) => r.pupilId)]) this.realtime.emitToUser(u, 'class:state', { sessionId });
+    }
+    return result;
+  }
+
+  /** Everybody in the class (like Telegram's voice chat list): who is on stage, who raised a hand. Under-18 ids/photos are shown only to the teacher and the child. */
+  async audience(actor: Actor, sessionId: string) {
+    const { s, c, teacher } = await this.load(actor, sessionId);
+    const now = this.clock.now();
+    const [enr, parts, att, t] = await Promise.all([
+      this.prisma.classEnrollment.findMany({ where: { classId: s.classId, status: 'ACTIVE' }, include: { pupil: { select: { id: true, name: true, username: true, dateOfBirth: true, avatarFileId: true } } } }),
+      this.prisma.classParticipant.findMany({ where: { sessionId } }),
+      this.prisma.classAttendance.findMany({ where: { sessionId } }),
+      this.prisma.user.findUniqueOrThrow({ where: { id: (await this.prisma.teacherProfile.findUniqueOrThrow({ where: { id: c.teacherId }, select: { userId: true } })).userId }, select: { id: true, name: true, username: true, avatarFileId: true } }),
+    ]);
+    const items = enr.map((e) => {
+      const p = parts.find((x) => x.pupilId === e.pupilId);
+      const a = att.find((x) => x.pupilId === e.pupilId);
+      const minor = !e.pupil.dateOfBirth || ageInYears(e.pupil.dateOfBirth, now) < ADULT_AGE;
+      const show = !minor || teacher || e.pupilId === actor.id;
+      return { id: show ? e.pupilId : null, key: e.pupilId, name: e.pupil.name, username: show ? e.pupil.username : null, hasPhoto: show && !!e.pupil.avatarFileId, teacher: false, me: e.pupilId === actor.id, present: !!a?.presentNow, hand: !!p?.handRaisedAt && !p?.removedAt, handRaisedAt: p?.handRaisedAt ?? null, stage: p?.removedAt ? 'NONE' : p?.stage ?? 'NONE', removed: !!p?.removedAt };
+    });
+    items.sort((x, y) => Number(y.hand) - Number(x.hand) || (x.handRaisedAt?.getTime() ?? 0) - (y.handRaisedAt?.getTime() ?? 0) || Number(y.stage !== 'NONE') - Number(x.stage !== 'NONE') || Number(y.present) - Number(x.present) || (x.name ?? '').localeCompare(y.name ?? ''));
+    return { items: [{ id: t.id, key: t.id, name: t.name, username: t.username, hasPhoto: !!t.avatarFileId, teacher: true, me: t.id === actor.id, present: true, hand: false, handRaisedAt: null, stage: 'NONE', removed: false }, ...items.filter((i) => !i.removed)] };
+  }
+
   async roster(actor: Actor, sessionId: string) {
     const { c } = await this.asTeacher(actor, sessionId);
     const [enr, parts, att] = await Promise.all([

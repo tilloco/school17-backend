@@ -129,6 +129,26 @@ describe('class room core (R2, integration)', () => {
     assert.equal((await api(t, other.user.token).get(`${base}/roster`)).status, 404);
   });
 
+  it('audience: everybody sees the class list (teacher first, raised hands next, stage marked); under-18 ids stay hidden from other pupils', async () => {
+    const { x, sid, pupils, base } = await live(3);
+    const [a, b, kid] = pupils;
+    await t.prisma.user.update({ where: { id: kid.id }, data: { dateOfBirth: new Date('2012-05-05') } });
+    assert.equal((await api(t, b.token).post(`${base}/hand`, { raised: true })).status, 200);
+    assert.equal((await api(t, x.user.token).post(`${base}/stage/grant`, { pupilId: a.id, mode: 'VOICE' })).status, 200);
+    const list = (await api(t, a.token).get(`${base}/audience`)).body.items;
+    assert.equal(list[0].teacher, true);
+    assert.equal(list[1].hand, true, 'raised hand right after the teacher');
+    assert.equal(list.find((i: any) => i.me).stage, 'VOICE');
+    const k = list.find((i: any) => i.name?.startsWith('Pupil2'));
+    assert.equal(k.id, null, 'a child is anonymous to other pupils');
+    assert.equal(k.hasPhoto, false);
+    const asTeacher = (await api(t, x.user.token).get(`${base}/audience`)).body.items.find((i: any) => i.name?.startsWith('Pupil2'));
+    assert.equal(asTeacher.id, kid.id, 'the teacher sees everybody');
+    const stranger = await makeUser(t, Role.STUDENT);
+    assert.equal((await api(t, stranger.token).get(`${base}/audience`)).status, 404);
+    void sid;
+  });
+
   it('hand raise -> grant voice -> token reflects the grant -> revoke; permissions are set on the server', async () => {
     const { x, sid, pupils, base } = await live(3);
     const [a, b] = pupils;
