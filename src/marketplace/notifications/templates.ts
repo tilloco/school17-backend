@@ -122,6 +122,26 @@ export const TEMPLATES: Record<string, Record<NotifLocale, Template>> = {
     ru: { title: 'Занятие отменено', body: 'Одно занятие класса отменено. Подробности в приложении.' },
     en: { title: 'Class session cancelled', body: 'One class session was cancelled. See the app for details.' },
   },
+  'class.request': {
+    uz: { title: "Sinfga yangi so'rov", body: "Kimdir sinfga qo'shilmoqchi. Ko'rib chiqing." },
+    ru: { title: 'Новая заявка в класс', body: 'Кто-то хочет вступить в класс. Посмотрите заявку.' },
+    en: { title: 'New request to join', body: 'Someone asked to join your class. Take a look.' },
+  },
+  'class.approved': {
+    uz: { title: "Sinfga qabul qilindingiz", body: "So'rovingiz tasdiqlandi. Endi sinfga kirishingiz mumkin." },
+    ru: { title: 'Вас приняли в класс', body: 'Заявка одобрена. Теперь можно зайти в класс.' },
+    en: { title: 'You are in the class', body: 'Your request was approved. You can open the class now.' },
+  },
+  'class.declined': {
+    uz: { title: "So'rov qabul qilinmadi", body: "Sinfga qo'shilish so'rovingiz rad etildi." },
+    ru: { title: 'Заявка отклонена', body: 'Ваша заявка в класс отклонена.' },
+    en: { title: 'Request not accepted', body: 'Your request to join the class was declined.' },
+  },
+  'class.helper': {
+    uz: { title: "Siz yordamchi bo'ldingiz", body: "O'qituvchi sizni sinfga yordamchi qilib tayinladi." },
+    ru: { title: 'Вы помощник в классе', body: 'Преподаватель назначил вас помощником класса.' },
+    en: { title: 'You are a class helper', body: 'The teacher made you a helper of a class.' },
+  },
   'class.removed': {
     uz: { title: 'Sinfdan chiqarildi', body: "O'qituvchi sizni sinfdan chiqardi." },
     ru: { title: 'Вас убрали из класса', body: 'Преподаватель убрал вас из класса.' },

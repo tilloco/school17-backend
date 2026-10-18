@@ -61,6 +61,8 @@ export class PrivacyService {
       await tx.topicVideoVote.deleteMany({ where: { userId: actor.id } });
       await tx.teacherComment.deleteMany({ where: { authorId: actor.id } });
       await tx.topicVideo.deleteMany({ where: { addedById: actor.id } });
+      await tx.classHelper.deleteMany({ where: { userId: actor.id } });
+      await tx.classEnrollment.deleteMany({ where: { pupilId: actor.id, status: { in: ['PENDING', 'DECLINED'] } } });
       // 4) bog'lamlar
       await tx.guardianLink.updateMany({ where: { OR: [{ guardianId: actor.id }, { studentId: actor.id }] }, data: { status: 'REVOKED' } });
       await tx.guardianLinkCode.deleteMany({ where: { studentId: actor.id } });

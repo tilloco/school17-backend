@@ -270,7 +270,7 @@ export class TeachersService {
   private async stats(profileId: string) {
     const [b, e, lessons, sessions] = await Promise.all([
       this.prisma.booking.findMany({ where: { teacherId: profileId, status: 'COMPLETED' }, select: { studentId: true }, distinct: ['studentId'] }),
-      this.prisma.classEnrollment.findMany({ where: { class: { teacherId: profileId } }, select: { pupilId: true }, distinct: ['pupilId'] }),
+      this.prisma.classEnrollment.findMany({ where: { status: { in: ['ACTIVE', 'LEFT', 'REMOVED'] }, class: { teacherId: profileId } }, select: { pupilId: true }, distinct: ['pupilId'] }),
       this.prisma.booking.count({ where: { teacherId: profileId, status: 'COMPLETED' } }),
       this.prisma.classSession.count({ where: { class: { teacherId: profileId }, status: 'ENDED' } }),
     ]);

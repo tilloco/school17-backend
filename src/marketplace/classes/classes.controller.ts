@@ -28,6 +28,8 @@ class ClassDto {
   @IsOptional() @IsBoolean() protectContent?: boolean;
   @IsOptional() @IsString() @MaxLength(20) theme?: string;
   @IsOptional() @IsBoolean() requirePaidToJoin?: boolean;
+  @IsOptional() @IsBoolean() joinApproval?: boolean;
+  @IsOptional() @IsBoolean() requireProof?: boolean;
   @IsOptional() @IsBoolean() firstSessionTrial?: boolean;
 }
 class UpdateClassDto {
@@ -46,12 +48,16 @@ class UpdateClassDto {
   @IsOptional() @IsBoolean() protectContent?: boolean;
   @IsOptional() @IsString() @MaxLength(20) theme?: string;
   @IsOptional() @IsBoolean() requirePaidToJoin?: boolean;
+  @IsOptional() @IsBoolean() joinApproval?: boolean;
+  @IsOptional() @IsBoolean() requireProof?: boolean;
   @IsOptional() @IsBoolean() firstSessionTrial?: boolean;
 }
 class JoinDto {
   @IsOptional() @IsString() @MaxLength(20) code?: string;
   @IsOptional() @IsString() @MaxLength(64) token?: string;
   @IsOptional() @IsUUID() studentId?: string;
+  @IsOptional() @IsUUID() proofFileId?: string;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
 }
 class LeaveDto {
   @IsOptional() @IsUUID() studentId?: string;

@@ -11,6 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { BlocksService } from '../safety/blocks.service';
 import { RealtimeService } from '../messaging/realtime.service';
 import { ClassRemindersService } from './class-reminders.service';
+import { ClassRequestsService } from './class-requests.service';
 import { firstName, hashSecret, newInviteToken, newJoinCode, normalizeCode, ScheduleInput, sessionTimes } from './class-rules';
 
 const WEEK_MS = 7 * 86_400_000;
@@ -38,6 +39,8 @@ export interface ClassInput {
   protectContent?: boolean;
   theme?: string;
   requirePaidToJoin?: boolean;
+  joinApproval?: boolean;
+  requireProof?: boolean;
   firstSessionTrial?: boolean;
 }
 
@@ -55,6 +58,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     private legal: LegalService,
     private reminders: ClassRemindersService,
     private realtime: RealtimeService,
+    private requests: ClassRequestsService,
   ) {}
 
   onModuleInit() {
@@ -124,7 +128,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
             priceMinor: input.priceMinor ?? 0, priceModel: input.priceModel ?? 'PER_SESSION', weekdays: oneOff ? [] : input.weekdays ?? [], startMinute: input.startMinute ?? 0,
             durationMin: input.durationMin ?? 60, timezone: tz, startDate, endDate, oneOffStartAt: oneOff,
             stageMode: input.stageMode ?? 'HAND_RAISE', chatMode: input.chatMode ?? 'OPEN', questionsMode: input.questionsMode ?? 'OPEN',
-            allowDownload: input.allowDownload ?? true, protectContent: input.protectContent ?? false, requirePaidToJoin: input.requirePaidToJoin ?? false, firstSessionTrial: input.firstSessionTrial ?? false,
+            allowDownload: input.allowDownload ?? true, protectContent: input.protectContent ?? false, requirePaidToJoin: input.requirePaidToJoin ?? false, joinApproval: input.joinApproval ?? false, requireProof: input.requireProof ?? false, firstSessionTrial: input.firstSessionTrial ?? false,
             codeHash: hashSecret(code), inviteHash: hashSecret(invite),
           },
         });
@@ -146,7 +150,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     if (input.capacity !== undefined && input.capacity < c.enrolledCount) throw new ConflictException({ message: 'Capacity is below the number of enrolled pupils', code: 'CAPACITY_BELOW_ENROLLED' });
     const data: Prisma.ClassUpdateInput = {};
     for (const k of ['title', 'subject', 'description'] as const) if (input[k] !== undefined) data[k] = String(input[k]).trim();
-    for (const k of ['capacity', 'priceMinor', 'priceModel', 'stageMode', 'chatMode', 'questionsMode', 'slowModeSeconds', 'handRaiseOn', 'allowDownload', 'protectContent', 'theme', 'requirePaidToJoin', 'firstSessionTrial'] as const) if (input[k] !== undefined) (data as any)[k] = input[k];
+    for (const k of ['capacity', 'priceMinor', 'priceModel', 'stageMode', 'chatMode', 'questionsMode', 'slowModeSeconds', 'handRaiseOn', 'allowDownload', 'protectContent', 'theme', 'requirePaidToJoin', 'joinApproval', 'requireProof', 'firstSessionTrial'] as const) if (input[k] !== undefined) (data as any)[k] = input[k];
     await this.prisma.class.update({ where: { id }, data });
     if (input.protectContent !== undefined && input.protectContent !== c.protectContent) {
       const members = await this.prisma.classEnrollment.findMany({ where: { classId: id, status: 'ACTIVE' }, select: { pupilId: true } });
@@ -239,7 +243,7 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ---------- qo'shilish ----------
-  async join(actor: Actor, input: { code?: string; token?: string; studentId?: string }) {
+  async join(actor: Actor, input: { code?: string; token?: string; studentId?: string; proofFileId?: string; note?: string }) {
     const cfg = marketConfig();
     const now = this.clock.now();
     const since = new Date(now.getTime() - 3_600_000);
@@ -254,10 +258,10 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     } else if (input.token && input.token.length <= 64) where = { inviteHash: hashSecret(input.token) };
     const c = where ? await this.prisma.class.findFirst({ where: { ...where, status: 'ACTIVE' } }) : null;
     if (!c) throw new NotFoundException({ message: 'Class not found', code: 'CLASS_NOT_FOUND' });
-    return this.enroll(actor, c, input.studentId);
+    return this.enroll(actor, c, input.studentId, { proofFileId: input.proofFileId, note: input.note });
   }
 
-  private async enroll(actor: Actor, c: Class, studentIdIn?: string) {
+  private async enroll(actor: Actor, c: Class, studentIdIn?: string, req: { proofFileId?: string; note?: string } = {}) {
     const now = this.clock.now();
     let studentId: string;
     if (actor.role === Role.STUDENT) {
@@ -283,6 +287,9 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     const existing = await this.prisma.classEnrollment.findUnique({ where: { classId_pupilId: { classId: c.id, pupilId: studentId } } });
     if (existing?.status === 'ACTIVE') throw new ConflictException({ message: 'Already enrolled', code: 'ALREADY_ENROLLED' });
     if (existing?.status === 'REMOVED') throw new ForbiddenException({ message: 'The teacher removed this pupil from the class', code: 'REMOVED' });
+
+    // Closed class: this is a REQUEST for a place; the teacher or a helper decides (the seat is taken only on approval)
+    if (c.joinApproval) return this.requests.create(actor, c, studentId, req);
 
     // Sig'im atomik: shartli UPDATE — parallel so'rovlarda ham aynan `capacity` ta o'rin beriladi
     await this.prisma.$transaction(async (tx) => {
@@ -345,13 +352,24 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
     return {
       id: c.id, title: c.title, subject: c.subject, description: c.description, capacity: c.capacity, priceMinor: c.priceMinor, priceModel: c.priceModel,
       weekdays: c.weekdays, startMinute: c.startMinute, durationMin: c.durationMin, timezone: c.timezone, startDate: c.startDate, endDate: c.endDate, oneOffStartAt: c.oneOffStartAt,
-      stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode, slowModeSeconds: c.slowModeSeconds, handRaiseOn: c.handRaiseOn, protectContent: c.protectContent, theme: c.theme, hasLogo: !!c.logoFileId, allowDownload: c.allowDownload, requirePaidToJoin: c.requirePaidToJoin, firstSessionTrial: c.firstSessionTrial, status: c.status,
+      stageMode: c.stageMode, chatMode: c.chatMode, questionsMode: c.questionsMode, slowModeSeconds: c.slowModeSeconds, handRaiseOn: c.handRaiseOn, protectContent: c.protectContent, theme: c.theme, hasLogo: !!c.logoFileId, allowDownload: c.allowDownload, requirePaidToJoin: c.requirePaidToJoin, joinApproval: c.joinApproval, requireProof: c.requireProof, firstSessionTrial: c.firstSessionTrial, status: c.status,
     };
   }
 
   private async teacherView(id: string) {
     const c = await this.prisma.class.findUniqueOrThrow({ where: { id }, include: { enrollments: { where: { status: 'ACTIVE' }, include: { pupil: { select: { id: true, name: true } } }, orderBy: { createdAt: 'asc' } } } });
-    return { ...this.baseView(c), enrolled: c.enrolledCount, pupils: c.enrollments.map((e) => ({ id: e.pupil.id, name: e.pupil.name })), role: 'teacher' as const };
+    const pendingRequests = await this.prisma.classEnrollment.count({ where: { classId: id, status: 'PENDING' } });
+    return { ...this.baseView(c), enrolled: c.enrolledCount, pupils: c.enrollments.map((e) => ({ id: e.pupil.id, name: e.pupil.name })), role: 'teacher' as const, pendingRequests };
+  }
+
+  /** What a helper sees of the class: the class card, who the teacher is, what they may do and what is waiting. No money, no editing. */
+  private async helperView(id: string, h: { canPayments: boolean; canMembers: boolean; canChat: boolean }) {
+    const c = await this.prisma.class.findUniqueOrThrow({ where: { id }, include: { teacher: { select: { id: true, user: { select: { name: true } } } } } });
+    const [pendingRequests, paymentsToCheck] = await Promise.all([
+      h.canMembers ? this.prisma.classEnrollment.count({ where: { classId: id, status: 'PENDING' } }) : Promise.resolve(0),
+      h.canPayments ? this.prisma.classPayment.count({ where: { classId: id, status: 'PUPIL_MARKED_PAID' } }) : Promise.resolve(0),
+    ]);
+    return { ...this.baseView(c), enrolled: c.enrolledCount, role: 'assistant' as const, teacher: { id: c.teacher.id, name: c.teacher.user.name }, perms: h, pendingRequests, paymentsToCheck, mySeats: [], classmates: [] };
   }
 
   private async participantView(actor: Actor, id: string) {
@@ -366,6 +384,8 @@ export class ClassesService implements OnModuleInit, OnModuleDestroy {
   }
 
   async get(actor: Actor, id: string) {
+    const asHelper = await this.prisma.classHelper.findUnique({ where: { classId_userId: { classId: id, userId: actor.id } } });
+    if (asHelper) return this.helperView(id, asHelper);
     if (actor.role === Role.TEACHER) {
       const t = await this.prisma.teacherProfile.findFirst({ where: { userId: actor.id } });
       const own = t ? await this.prisma.class.findFirst({ where: { id, teacherId: t.id }, select: { id: true } }) : null;

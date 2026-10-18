@@ -52,6 +52,10 @@ export class ClassFilesController {
   @Post(':fid/download-url') @HttpCode(200) @RequirePermission('class.read')
   downloadUrl(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('fid', ParseUUIDPipe) fid: string) { return this.files.downloadUrl(a, id, fid); }
 
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Post(':fid/stream-url') @HttpCode(200) @RequirePermission('class.read')
+  streamUrl(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('fid', ParseUUIDPipe) fid: string) { return this.files.streamUrl(a, id, fid); }
+
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post(':fid/report') @HttpCode(201) @RequirePermission('report.create')
   report(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('fid', ParseUUIDPipe) fid: string, @Body() dto: ReportFileDto) { return this.files.report(a, id, fid, dto.reason, dto.note); }

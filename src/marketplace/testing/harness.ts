@@ -169,7 +169,7 @@ export function isDenied(status: number): boolean {
 export async function makeFile(
   t: TestApp,
   ownerId: string,
-  opts: { purpose?: 'CREDENTIAL' | 'MESSAGE_ATTACHMENT' | 'AVATAR'; status?: 'PENDING_UPLOAD' | 'UPLOADED' | 'QUARANTINED' | 'READY' | 'REJECTED' } = {},
+  opts: { purpose?: 'CREDENTIAL' | 'MESSAGE_ATTACHMENT' | 'AVATAR' | 'CLASS_FILE' | 'PAYMENT_PROOF'; status?: 'PENDING_UPLOAD' | 'UPLOADED' | 'QUARANTINED' | 'READY' | 'REJECTED' } = {},
 ) {
   const id = randomUUID();
   return t.prisma.storedFile.create({

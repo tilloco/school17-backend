@@ -25,7 +25,7 @@ export class CommentsService {
     if (!userIds.length) return new Set();
     const [b, e] = await Promise.all([
       this.prisma.booking.findMany({ where: { teacherId: teacherProfileId, studentId: { in: userIds }, status: 'COMPLETED' }, select: { studentId: true } }),
-      this.prisma.classEnrollment.findMany({ where: { pupilId: { in: userIds }, class: { teacherId: teacherProfileId } }, select: { pupilId: true } }),
+      this.prisma.classEnrollment.findMany({ where: { pupilId: { in: userIds }, status: { in: ['ACTIVE', 'LEFT', 'REMOVED'] }, class: { teacherId: teacherProfileId } }, select: { pupilId: true } }),
     ]);
     return new Set([...b.map((x) => x.studentId), ...e.map((x) => x.pupilId)]);
   }

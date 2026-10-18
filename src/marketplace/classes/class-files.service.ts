@@ -138,6 +138,16 @@ export class ClassFilesService implements OnModuleInit {
     return this.files.downloadUrl(actor, f.fileId, 'original');
   }
 
+  /** A recorded lesson plays inside the app. Streaming is allowed even when downloads are off (protected class): the person watches, but gets no file. */
+  async streamUrl(actor: Actor, classId: string, id: string) {
+    await this.memberOf(actor, classId);
+    const f = await this.fileIn(classId, id);
+    const sf = await this.prisma.storedFile.findUnique({ where: { id: f.fileId }, select: { finalMime: true, mime: true } });
+    const mime = sf?.finalMime ?? sf?.mime ?? '';
+    if (!mime.startsWith('video/') && !mime.startsWith('audio/')) throw new BadRequestException({ message: 'This file is not a video or audio recording', code: 'NOT_A_VIDEO' });
+    return { ...(await this.files.signedGet(actor, f.fileId, 6 * 3600)), mime };
+  }
+
   // ---------- sahifa rasmlari ----------
   async page(actor: Actor, classId: string, id: string, n: number, size: PageSize) {
     await this.memberOf(actor, classId);

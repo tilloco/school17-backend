@@ -41,7 +41,7 @@ export class ClassPaymentsService {
   ) {}
 
   private async ownClass(actor: Actor, classId: string) {
-    const c = await this.prisma.class.findFirst({ where: { id: classId, teacher: { userId: actor.id } } });
+    const c = await this.prisma.class.findFirst({ where: { id: classId, OR: [{ teacher: { userId: actor.id } }, { helpers: { some: { userId: actor.id, canPayments: true } } }] } });
     if (!c) throw new NotFoundException('Class not found');
     return c;
   }

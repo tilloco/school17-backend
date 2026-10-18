@@ -280,6 +280,16 @@ export class FilesService {
     return !!(await this.prisma.classEnrollment.findFirst({ where: { classId: post.classId, pupilId: actor.id, status: 'ACTIVE' }, select: { id: true } }));
   }
 
+  /** A signed address for a file whose access the CALLER already checked (for example class membership for a recorded lesson). The address lives `ttlSeconds` so a long video can be sought through. */
+  async signedGet(actor: Actor, fileId: string, ttlSeconds: number) {
+    const file = await this.prisma.storedFile.findUnique({ where: { id: fileId } });
+    if (!file || file.deletedAt || file.status !== 'READY') throw new NotFoundException('Not found');
+    const exp = Math.floor(this.clock.now().getTime() / 1000) + ttlSeconds;
+    const p: SignedParams = { op: 'get', fileId, part: 'original', uid: actor.id, exp };
+    const base = this.config.get<string>('FILES_PUBLIC_BASE_URL') || '';
+    return { url: `${base}/files/blob/${fileId}/original?${signedQuery(this.secret(), p)}`, expiresAt: new Date(exp * 1000) };
+  }
+
   async downloadUrl(actor: Actor, fileId: string, variant: 'original' | 'thumb', adminOverride = false) {
     const file = await this.prisma.storedFile.findUnique({ where: { id: fileId } });
     const allowed = file && (adminOverride ? !file.deletedAt && file.status === 'READY' && (file.purpose === 'CREDENTIAL' || file.purpose === 'PAYMENT_PROOF') : await this.canRead(actor, file));

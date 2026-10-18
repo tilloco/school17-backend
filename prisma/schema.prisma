@@ -1171,6 +1171,8 @@ enum ClassEnrollmentStatus {
   ACTIVE
   REMOVED
   LEFT
+  PENDING // asked for a place, waiting for the teacher or a helper
+  DECLINED
 }
 
 model Class {
@@ -1201,6 +1203,9 @@ model Class {
   logoFileId        String? // kanal logosi (o'qituvchi yuklaydi)
   protectContent    Boolean            @default(false) // o'qituvchi yoqadi: a'zolar uchun skrinshot/yozib olish yopiq, PDF va fayllar yuklanmaydi, xabarlarni nusxalab/ulashib bo'lmaydi
   requirePaidToJoin Boolean            @default(false)
+  joinApproval      Boolean            @default(false) // people ask for a place and the teacher or a helper approves
+  requireProof      Boolean            @default(false) // the request must carry a photo of the payment
+  helpers           ClassHelper[]
   firstSessionTrial Boolean            @default(false)
   status            ClassStatus        @default(ACTIVE)
   codeHash          String             @unique
@@ -1261,6 +1266,10 @@ model ClassEnrollment {
   enrolledBy   User                  @relation("ClassEnrolledBy", fields: [enrolledById], references: [id], onDelete: Restrict)
   status       ClassEnrollmentStatus @default(ACTIVE)
   endedAt      DateTime?
+  proofFileId  String? // photo of the payment sent with a join request
+  note         String?
+  decidedAt    DateTime?
+  decidedById  String?
   createdAt    DateTime              @default(now())
 
   @@unique([classId, pupilId])
@@ -1697,4 +1706,19 @@ model TopicAttempt {
 
   @@index([topicId, score])
   @@index([userId, createdAt])
+}
+
+// A person the teacher trusts to run part of a class (answer questions, check payment photos, approve requests)
+model ClassHelper {
+  id          String   @id @default(uuid())
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  userId      String
+  canPayments Boolean  @default(true)
+  canMembers  Boolean  @default(true)
+  canChat     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([classId, userId])
+  @@index([userId])
 }
