@@ -56,6 +56,11 @@ export class PrivacyService {
       }
       // 3) yozilgan sharhlar: baho qoladi (agregatlar buzilmasin), matn o'chadi
       await tx.review.updateMany({ where: { authorId: actor.id }, data: { text: '' } });
+      // 3b) topic scores, votes, public comments and the videos this teacher added: all of it is personal activity and goes
+      await tx.topicAttempt.deleteMany({ where: { userId: actor.id } });
+      await tx.topicVideoVote.deleteMany({ where: { userId: actor.id } });
+      await tx.teacherComment.deleteMany({ where: { authorId: actor.id } });
+      await tx.topicVideo.deleteMany({ where: { addedById: actor.id } });
       // 4) bog'lamlar
       await tx.guardianLink.updateMany({ where: { OR: [{ guardianId: actor.id }, { studentId: actor.id }] }, data: { status: 'REVOKED' } });
       await tx.guardianLinkCode.deleteMany({ where: { studentId: actor.id } });

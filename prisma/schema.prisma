@@ -1626,3 +1626,75 @@ model ClassChannelRead {
   @@id([classId, userId])
   @@index([userId])
 }
+
+// ---------------- Topics: one page per exact topic (videos from verified teachers, a check test, who teaches it) ----------------
+
+model Topic {
+  id        String          @id @default(uuid())
+  slug      String          @unique
+  subject   String
+  level     String
+  position  Int             @default(0)
+  titles    Json // { uz, ru, en }
+  summaries Json // { uz, ru, en }
+  createdAt DateTime        @default(now())
+  videos    TopicVideo[]
+  questions TopicQuestion[]
+  attempts  TopicAttempt[]
+
+  @@index([subject, level])
+}
+
+model TopicVideo {
+  id        String           @id @default(uuid())
+  topicId   String
+  topic     Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  addedById String // the verified teacher who added the link
+  url       String
+  videoId   String? // YouTube id when known (for the thumbnail and to refuse duplicates)
+  title     String
+  lang      String // uz | ru | en
+  curated   Boolean          @default(false) // picked by the School17 team (checked to exist and to be embeddable)
+  author    String? // the channel name, shown as credit on picked videos
+  hidden    Boolean          @default(false)
+  score     Int              @default(0) // number of votes
+  createdAt DateTime         @default(now())
+  votes     TopicVideoVote[]
+
+  @@index([topicId, hidden, score])
+  @@index([addedById])
+}
+
+model TopicVideoVote {
+  videoId   String
+  video     TopicVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime   @default(now())
+
+  @@id([videoId, userId])
+}
+
+model TopicQuestion {
+  id       String @id // stable: "<slug>-<n>"
+  topicId  String
+  topic    Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  position Int    @default(0)
+  texts    Json // { uz, ru, en }
+  options  Json // string[] or { uz: string[], ru: string[], en: string[] }
+  correct  Int
+
+  @@index([topicId])
+}
+
+model TopicAttempt {
+  id        String   @id @default(uuid())
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  userId    String
+  score     Int
+  total     Int
+  createdAt DateTime @default(now())
+
+  @@index([topicId, score])
+  @@index([userId, createdAt])
+}

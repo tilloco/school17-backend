@@ -1,0 +1,1 @@
+ALTER TABLE "TopicVideo" ADD COLUMN "curated" BOOLEAN NOT NULL DEFAULT false, ADD COLUMN "author" TEXT;

@@ -16,7 +16,7 @@ function walk(dir: string): string[] {
 
 describe('route inventory (static): every endpoint is guarded and permissioned', () => {
   // Bu controller'lar ataylab ochiq: hujjat matnlari, imzolangan URL "saqlash" tomoni, provayder webhook'i (o'z imzosi bor)
-  const PUBLIC_CLASSES = new Set(['PublicLegalController', 'FilesStorageController', 'CallsWebhookController']);
+  const PUBLIC_CLASSES = new Set(['PublicLegalController', 'FilesStorageController', 'CallsWebhookController', 'ShareController', 'LegalPagesController']);
   const files = walk(join(__dirname, '..'));
   const classes: { name: string; guarded: boolean; handlers: { line: string; permissioned: boolean }[] }[] = [];
   for (const f of files) {
@@ -53,7 +53,7 @@ describe('route inventory (static): every endpoint is guarded and permissioned',
   });
   it('the public controllers expose only the documented endpoints', () => {
     const pub = classes.filter((c) => PUBLIC_CLASSES.has(c.name)).flatMap((c) => c.handlers.map((h) => `${c.name}: ${h.line}`));
-    assert.equal(pub.length, 7, pub.join(String.fromCharCode(10))); // terms, privacy, guardian-statement, safety tips, upload PUT, blob GET, call webhook POST
+    assert.equal(pub.length, 12, pub.join(String.fromCharCode(10))); // terms, privacy, guardian-statement, safety tips, upload PUT, blob GET, call webhook POST, share preview pages for a teacher and a topic (public facts only), and the privacy, terms and delete-account web pages
   });
 });
 
