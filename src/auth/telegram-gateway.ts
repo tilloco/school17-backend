@@ -34,7 +34,8 @@ export class DevSender implements CodeSender {
   async send() { return { ok: true }; }
 }
 
-export const makeSender = (): CodeSender => (process.env.TELEGRAM_GATEWAY_TOKEN ? new TelegramGatewaySender(process.env.TELEGRAM_GATEWAY_TOKEN) : new DevSender());
+// Tests never talk to the real Telegram, even when a real token is present in .env (they use the dev sender or a fake fetch).
+export const makeSender = (): CodeSender => (process.env.TELEGRAM_GATEWAY_TOKEN && process.env.NODE_ENV !== 'test' ? new TelegramGatewaySender(process.env.TELEGRAM_GATEWAY_TOKEN) : new DevSender());
 
 /** +998 90 123-45-67 → +998901234567 (E.164, 8–15 raqam); noto'g'ri bo'lsa null */
 export function normalizePhone(raw: string): string | null {

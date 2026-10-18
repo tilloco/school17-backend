@@ -10,6 +10,7 @@ import { createHash, randomInt } from 'crypto';
 import { CodeSender, makeSender, normalizePhone } from './telegram-gateway';
 import { PhoneVerifyDto } from './dto/phone-auth.dto';
 import { normalizeUsername, usernameProblem } from '../marketplace/account/username';
+import { GateState, gateStep, HOUR } from './code-gate';
 
 @Injectable()
 export class AuthService {
@@ -131,15 +132,64 @@ export class AuthService {
   private static readonly MAX_CODE_TRIES = 5;
   private codeHash = (phone: string, code: string) => createHash('sha256').update(`${phone}:${code}`).digest('hex');
 
-  async requestPhoneCode(rawPhone: string): Promise<{ sent: boolean; ttlSeconds: number; devCode?: string }> {
+  private toGate = (r: { windowStart: Date; count: number; lastAt: Date; blockedUntil: Date | null; strictUntil: Date | null }): GateState => ({ windowStart: r.windowStart, count: r.count, lastAt: r.lastAt, blockedUntil: r.blockedUntil, strictUntil: r.strictUntil });
+
+  /** Takes one request from this person's allowance (see code-gate.ts) or refuses with how long to wait. Returns what to put back if the code could not be sent through our fault. */
+  private async takeGate(key: string, now: Date): Promise<GateState | null> {
+    for (let i = 0; i < 4; i++) {
+      const row = await this.prisma.phoneRequestGate.findUnique({ where: { key } });
+      const prev = row ? this.toGate(row) : null;
+      const r = gateStep(prev, now);
+      if (!r.ok) {
+        const retryAfterSeconds = Math.ceil(r.retryAfterMs / 1000);
+        throw new HttpException({ message: 'You can ask for a new code again later', code: 'CODE_LOCKED', retryAfterSeconds }, 429);
+      }
+      try {
+        if (!row) await this.prisma.phoneRequestGate.create({ data: { key, ...r.next } });
+        else if ((await this.prisma.phoneRequestGate.updateMany({ where: { key, lastAt: row.lastAt, count: row.count }, data: r.next })).count === 0) continue; // someone else moved it first: look again
+        return prev;
+      } catch (e: any) {
+        if (e?.code === 'P2002') continue;
+        throw e;
+      }
+    }
+    throw new HttpException({ message: 'Try again in a moment', code: 'CODE_RATE' }, 429);
+  }
+
+  private async giveBackGate(key: string, prev: GateState | null) {
+    if (!prev) await this.prisma.phoneRequestGate.deleteMany({ where: { key } });
+    else await this.prisma.phoneRequestGate.updateMany({ where: { key }, data: prev });
+  }
+
+  /** A shared school or mobile address must not lock everybody out, so the address itself only has a generous hourly cap. */
+  private async addressCap(ip: string, now: Date) {
+    const key = `iph:${ip}`;
+    const row = await this.prisma.phoneRequestGate.findUnique({ where: { key } });
+    if (!row || now.getTime() - row.windowStart.getTime() >= HOUR) {
+      await this.prisma.phoneRequestGate.upsert({ where: { key }, create: { key, windowStart: now, count: 1, lastAt: now }, update: { windowStart: now, count: 1, lastAt: now, blockedUntil: null, strictUntil: null } });
+      return;
+    }
+    if (row.count >= 40) throw new HttpException({ message: 'Too many requests from this network. Try again later.', code: 'CODE_RATE', retryAfterSeconds: Math.ceil((row.windowStart.getTime() + HOUR - now.getTime()) / 1000) }, 429);
+    await this.prisma.phoneRequestGate.update({ where: { key }, data: { count: { increment: 1 }, lastAt: now } });
+  }
+
+  async requestPhoneCode(rawPhone: string, who: { deviceId?: string | null; ip?: string | null } = {}): Promise<{ sent: boolean; ttlSeconds: number; devCode?: string }> {
     const phone = normalizePhone(rawPhone);
     if (!phone) throw new BadRequestException({ message: 'Enter the phone number with the country code, for example +998901234567', code: 'BAD_PHONE' });
     const now = new Date();
+    // One person (the phone they hold, found by its device id; without one: the address) may ask 2 times in 2 hours, then waits 2 hours, then 1 per hour.
+    // Every request counts, also to a number that has no Telegram.
+    const ip = (who.ip ?? 'unknown').slice(0, 64);
+    await this.addressCap(ip, now);
+    const key = who.deviceId && /^[A-Za-z0-9_-]{16,64}$/.test(who.deviceId) ? `dev:${who.deviceId}` : `ip:${ip}`;
+    const prevGate = await this.takeGate(key, now);
+    if (Math.random() < 0.02) void this.prisma.phoneRequestGate.deleteMany({ where: { updatedAt: { lt: new Date(now.getTime() - 48 * HOUR) } } }).catch(() => undefined);
     // har raqamga: soatiga 5 ta kod, 30 soniyada 1 ta (kod yuborish pullik, suiiste'moldan himoya)
     const recent = await this.prisma.phoneLoginCode.findMany({ where: { phone, createdAt: { gt: new Date(now.getTime() - 3_600_000) } }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } });
     if (recent.length >= 5 || (recent[0] && now.getTime() - recent[0].createdAt.getTime() < 30_000)) throw new HttpException({ message: 'Too many code requests. Try again in a few minutes.', code: 'CODE_RATE' }, 429);
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     const res = await this.sender.send(phone, code, AuthService.CODE_TTL_S);
+    if (!res.ok && res.reason === 'FAILED') await this.giveBackGate(key, prevGate); // our or Telegram's fault: it must not cost the person a try
     if (!res.ok) throw new BadRequestException({ message: res.reason === 'NO_TELEGRAM' ? 'This number has no Telegram account. Use email instead.' : 'Could not send the code. Try again or use email.', code: res.reason === 'NO_TELEGRAM' ? 'NO_TELEGRAM' : 'SEND_FAILED' });
     await this.prisma.phoneLoginCode.create({ data: { phone, codeHash: this.codeHash(phone, code), expiresAt: new Date(now.getTime() + AuthService.CODE_TTL_S * 1000) } });
     const dev = this.sender.kind === 'dev' && process.env.NODE_ENV !== 'production' && process.env.PHONE_DEV_CODES === '1';

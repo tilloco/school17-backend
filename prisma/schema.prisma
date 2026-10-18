@@ -1563,6 +1563,17 @@ model NotificationPreference {
 }
 
 // Telegram Gateway orqali yuboriladigan bir martalik kirish kodlari (kod o'zi saqlanmaydi, faqat xesh)
+// How often one phone or device may ask for a sign-in code (see src/auth/code-gate.ts); also holds the hourly cap per address
+model PhoneRequestGate {
+  key          String    @id // "dev:<device id>", "ip:<address>" or "iph:<address>"
+  windowStart  DateTime
+  count        Int       @default(0)
+  lastAt       DateTime
+  blockedUntil DateTime?
+  strictUntil  DateTime?
+  updatedAt    DateTime  @updatedAt
+}
+
 model PhoneLoginCode {
   id        String   @id @default(uuid())
   phone     String

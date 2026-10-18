@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, Post, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { GoogleLoginDto } from './dto/google-login.dto';
@@ -35,8 +35,8 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('phone/request')
   @HttpCode(200)
-  requestPhone(@Body() dto: PhoneRequestDto) {
-    return this.authService.requestPhoneCode(dto.phone);
+  requestPhone(@Body() dto: PhoneRequestDto, @Headers('x-device-id') deviceId?: string, @Req() req?: { ip?: string }) {
+    return this.authService.requestPhoneCode(dto.phone, { deviceId, ip: req?.ip });
   }
 
   // POST /auth/phone/verify  { phone, code, [name, role, dateOfBirth, acceptTerms] }
