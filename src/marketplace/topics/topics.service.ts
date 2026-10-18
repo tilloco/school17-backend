@@ -133,6 +133,8 @@ export class TopicsService implements OnModuleInit {
       }),
       this.leaderboard(actor, t.id),
     ]);
+    // most useful first; at equal votes, videos in the person's own language come before the others (stable sort keeps the picked-first order)
+    videos.sort((x, y) => y.score - x.score || Number(y.lang === l) - Number(x.lang === l));
     const authors = await this.prisma.teacherProfile.findMany({ where: { userId: { in: videos.map((v) => v.addedById) } }, select: { id: true, userId: true, user: { select: { name: true } } } });
     const by = new Map(authors.map((a) => [a.userId, a]));
     return {

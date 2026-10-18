@@ -83,6 +83,7 @@ describe('topics (integration)', () => {
     assert.equal(d.questions, 4);
     assert.ok(d.videos.length >= 2, 'picked videos are there from the start');
     assert.ok(d.videos.every((v: any) => v.embed && v.embed.startsWith('https://')));
+    assert.equal(d.videos[0].lang, 'uz', 'a pupil using Uzbek sees the Uzbek videos first (equal votes)');
     assert.ok(d.videos.some((v: any) => v.curated && v.author && v.by === null), 'picked videos credit the channel, not a teacher');
     assert.equal(d.teachers[0].id, x.profileId, 'best-rated first');
     assert.equal(d.teachers[0].rating, 4.9);
