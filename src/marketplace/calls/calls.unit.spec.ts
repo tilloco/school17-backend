@@ -119,5 +119,6 @@ describe('providers', () => {
     assert.throws(() => createCallProvider({ CALL_PROVIDER: 'zoom' } as any));
     assert.equal(createCallProvider({ NODE_ENV: 'development' } as any).name, 'mock');
     assert.equal(createCallProvider({ CALL_PROVIDER: 'livekit', LIVEKIT_URL: 'wss://x', LIVEKIT_API_KEY: 'k', LIVEKIT_API_SECRET: 's' } as any).name, 'livekit');
+    assert.equal(createCallProvider({ NODE_ENV: 'production', ALLOW_MOCK_CALLS_IN_PRODUCTION: '1' } as any).name, 'mock');
   });
 });
