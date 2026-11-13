@@ -80,9 +80,10 @@ export class PrivacyService {
       // 6) foydalanuvchi qatori
       await tx.user.update({
         where: { id: actor.id },
-        data: { status: 'DELETED', deletedAt: now, email: `deleted-${actor.id}@deleted.invalid`, name: null, avatarUrl: null, dateOfBirth: null, examDate: null, locale: 'uz' },
+        // phone/username are unique: freeing them lets the same person sign up again later
+        data: { status: 'DELETED', deletedAt: now, email: `deleted-${actor.id}@deleted.invalid`, name: null, avatarUrl: null, dateOfBirth: null, examDate: null, locale: 'uz', phone: null, phoneHash: null, username: null, bio: null, passwordHash: null },
       });
-    });
+    }, { maxWait: 10_000, timeout: 30_000 });
     await this.audit.log(actor, { action: 'account.delete', targetType: 'User', targetId: actor.id });
     return { ok: true, retained: ['payment ledger', 'payments', 'safety reports', 'audit log', 'consent records'] };
   }

@@ -69,6 +69,10 @@ export class LegalPagesController {
     return render({ title: d.title.replace(/\s*\(draft\)/i, ''), banner: process.env.LEGAL_REVIEWED === '1' ? undefined : d.draftBanner, sections: d.sections.map((s) => ({ h: s.heading, p: s.body })), lang, path: `/${kind}` });
   }
 
+  /** Cheap "are you awake" check: the app calls it on start, a scheduled job calls it so the free server never goes to sleep. */
+  @Get('health')
+  health() { return { ok: true }; }
+
   @Get('privacy')
   @Header('Content-Type', 'text/html; charset=utf-8')
   @Header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'")

@@ -61,6 +61,13 @@ export class AuthService {
     return { accessToken, isNewUser };
   }
 
+  async usernameAvailability(raw: string): Promise<{ ok: boolean; reason?: 'TAKEN' | 'BAD' }> {
+    const problem = usernameProblem(raw);
+    if (problem) return { ok: false, reason: problem === 'RESERVED_USERNAME' ? 'TAKEN' : 'BAD' };
+    const taken = await this.prisma.user.findUnique({ where: { username: normalizeUsername(raw) }, select: { id: true } });
+    return taken ? { ok: false, reason: 'TAKEN' } : { ok: true };
+  }
+
   /** Ixtiyoriy @nom: noto'g'ri yoki band bo'lsa ro'yxatdan o'tish to'xtatiladi (foydalanuvchi boshqa nom tanlaydi). */
   private async checkedUsername(raw?: string): Promise<string | undefined> {
     if (!raw || !raw.trim()) return undefined;
@@ -221,13 +228,20 @@ export class AuthService {
       const username = await this.checkedUsername(dto.username);
       const kinds = dto.role === 'GUARDIAN' ? (['TERMS', 'PRIVACY', 'GUARDIAN_STATEMENT'] as const) : (['TERMS', 'PRIVACY'] as const);
       // User.email majburiy va noyob: telefon bilan kirganlarga ichki, hech qachon yetkazilmaydigan manzil beriladi
-      user = await this.prisma.user.create({
-        data: {
-          email: `tg${phone.slice(1)}@phone.school17.invalid`, phone, phoneHash: createHash('sha256').update(phone).digest('hex'), username, name: dto.name.trim(), role: dto.role, dateOfBirth: dob, locale: dto.locale ?? 'uz',
-          referralCode: this.generateReferralCode() + randomBytes(2).toString('hex').toUpperCase(),
-          consents: { create: kinds.map((kind) => ({ kind, version: CURRENT_VERSIONS[kind], locale: dto.locale ?? 'uz' })) },
-        },
-      });
+      try {
+        user = await this.prisma.user.create({
+          data: {
+            email: `tg${phone.slice(1)}@phone.school17.invalid`, phone, phoneHash: createHash('sha256').update(phone).digest('hex'), username, name: dto.name.trim(), role: dto.role, dateOfBirth: dob, locale: dto.locale ?? 'uz',
+            referralCode: this.generateReferralCode() + randomBytes(2).toString('hex').toUpperCase(),
+            consents: { create: kinds.map((kind) => ({ kind, version: CURRENT_VERSIONS[kind], locale: dto.locale ?? 'uz' })) },
+          },
+        });
+      } catch (e) {
+        // two sign-ups racing for the same @username both pass the check above; the unique index decides
+        const target = (e as { code?: string; meta?: { target?: unknown } }).code === 'P2002' ? String((e as { meta?: { target?: unknown } }).meta?.target ?? '') : '';
+        if (target.includes('username')) throw new ConflictException({ message: 'This username is taken', code: 'USERNAME_TAKEN' });
+        throw e;
+      }
     }
     await this.prisma.phoneLoginCode.update({ where: { id: row.id }, data: { usedAt: new Date() } });
     return { accessToken: this.jwt.sign({ sub: user.id, email: user.email }) };

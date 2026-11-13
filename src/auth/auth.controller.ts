@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, HttpCode, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Query, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { GoogleLoginDto } from './dto/google-login.dto';
@@ -45,5 +45,12 @@ export class AuthController {
   @HttpCode(200)
   verifyPhone(@Body() dto: PhoneVerifyDto) {
     return this.authService.verifyPhoneCode(dto);
+  }
+
+  // GET /auth/username-check?u=aziz - used while signing up, before the person has an account
+  @Throttle({ default: { limit: 40, ttl: 60_000 } })
+  @Get('username-check')
+  usernameCheck(@Query('u') u = '') {
+    return this.authService.usernameAvailability(String(u).slice(0, 40));
   }
 }

@@ -8,6 +8,11 @@ const MAX_RETRIES = 3; // jami urinishlar soni
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
+  constructor() {
+    // Prisma's 5 s default is too tight when the database is a network hop away (managed Postgres, cold starts)
+    super({ transactionOptions: { maxWait: 10_000, timeout: 20_000 } });
+  }
+
   async onModuleInit() {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
